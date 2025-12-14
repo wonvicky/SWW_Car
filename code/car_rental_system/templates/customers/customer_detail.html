@@ -1,0 +1,383 @@
+{% extends "vehicles/base.html" %}
+
+{% block title %}{{ customer.name }} - 客户详情 - 租车管理系统{% endblock %}
+
+{% block content %}
+<style>
+    .card-soft {
+        border: 1px solid #eef0f4;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        border-radius: 12px;
+    }
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #f4f6fb;
+        color: #334155;
+        font-size: 13px;
+    }
+    .stat-tile {
+        border: 1px solid #eef0f4;
+        border-radius: 12px;
+        padding: 16px;
+        height: 100%;
+        background: #fff;
+    }
+    .timeline-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+.section-narrow {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+</style>
+
+<!-- 顶部个人信息卡片 -->
+<div class="card card-soft mb-4 p-3 p-md-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:64px;height:64px;font-size:26px;">
+                {{ customer.name|slice:":1" }}
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h3 class="mb-0">{{ customer.name }}</h3>
+                    {% if customer.member_level == 'VIP' %}
+                        <span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i>VIP会员</span>
+                    {% else %}
+                        <span class="badge bg-secondary"><i class="bi bi-person me-1"></i>普通会员</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="chip"><i class="bi bi-telephone"></i>{{ customer.phone }}</span>
+                    {% if customer.email %}
+                    <span class="chip"><i class="bi bi-envelope"></i>{{ customer.email }}</span>
+                    {% endif %}
+                    <span class="chip"><i class="bi bi-clock-history"></i>注册 {{ customer.created_at|date:"Y-m-d" }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'customers:customer_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> 返回列表
+            </a>
+            <a href="{% url 'customers:customer_update' customer.pk %}" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> 编辑客户
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 客户概览与证件信息（参照表单式横向排版） -->
+    <div class="col-12 mb-4">
+        <div class="card card-soft">
+            <div class="card-body p-4">
+                <div class="row g-3">
+                    <!-- 客户姓名 -->
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label text-muted small mb-1"><i class="bi bi-person me-1"></i>客户姓名</label>
+                        <div class="form-control bg-white text-break">{{ customer.name }}</div>
+                        <div class="form-text">客户真实姓名</div>
+                    </div>
+                    <!-- 联系电话 -->
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label text-muted small mb-1"><i class="bi bi-telephone me-1"></i>联系电话</label>
+                        <div class="form-control bg-white text-break">{{ customer.phone }}</div>
+                        <div class="form-text">11位手机号码</div>
+                    </div>
+                    <!-- 电子邮箱 -->
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label text-muted small mb-1"><i class="bi bi-envelope me-1"></i>电子邮箱</label>
+                        <div class="form-control bg-white text-break">
+                            {% if customer.email %}{{ customer.email }}{% else %}<span class="text-muted">未提供</span>{% endif %}
+                        </div>
+                        <div class="form-text">可选，便于邮件联系</div>
+                    </div>
+                    <!-- 会员等级 -->
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label text-muted small mb-1"><i class="bi bi-star me-1"></i>会员等级</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <select class="form-select" style="max-width: 180px;" onchange="updateMembership({{ customer.pk }}, this.value)">
+                                <option value="NORMAL" {% if customer.member_level == 'NORMAL' %}selected{% endif %}>普通会员</option>
+                                <option value="VIP" {% if customer.member_level == 'VIP' %}selected{% endif %}>VIP会员</option>
+                            </select>
+                        </div>
+                        <div class="form-text">客户会员等级</div>
+                    </div>
+                </div>
+                <hr class="my-4">
+                <h6 class="fw-bold text-primary mb-3">证件信息</h6>
+                <div class="row g-3">
+                    <!-- 身份证号 -->
+                    <div class="col-lg-4 col-md-6">
+                        <label class="form-label text-muted small mb-1"><i class="bi bi-credit-card-2-front me-1"></i>身份证号</label>
+                        <div class="form-control bg-white text-break">{{ customer.id_card }}</div>
+                        <div class="form-text">18位身份证号码</div>
+                    </div>
+                    <!-- 驾驶证号 -->
+                    <div class="col-lg-4 col-md-6">
+                        <label class="form-label text-muted small mb-1"><i class="bi bi-card-checklist me-1"></i>驾驶证号</label>
+                        <div class="form-control bg-white text-break">{{ customer.license_number }}</div>
+                        <div class="form-text">驾驶证号码，须唯一</div>
+                    </div>
+                    <!-- 驾照类型 -->
+                    <div class="col-lg-4 col-md-6">
+                        <label class="form-label text-muted small mb-1"><i class="bi bi-award me-1"></i>驾照类型</label>
+                        <div class="form-control bg-white text-break">{{ customer.get_license_type_display }}</div>
+                        <div class="form-text">驾照准驾车型</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- VIP升级信息 -->
+    {% if vip_upgrade_info %}
+    <div class="col-12 mb-4">
+        <div class="card shadow-sm border-{% if vip_upgrade_info.is_eligible %}success{% else %}info{% endif %}">
+            <div class="card-header bg-{% if vip_upgrade_info.is_eligible %}success{% else %}info{% endif %} text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-star{% if vip_upgrade_info.is_eligible %}-fill{% endif %} me-2"></i>
+                    VIP升级资格
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if vip_upgrade_info.is_eligible %}
+                    <div class="alert alert-success mb-0">
+                        <i class="bi bi-check-circle me-2"></i>
+                        <strong>恭喜！</strong>该客户已满足VIP升级条件（连续{{ vip_upgrade_info.consecutive_count }}个订单表现优异），系统将在下次还车时自动升级为VIP会员。
+                    </div>
+                {% else %}
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="mb-1">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>VIP升级条件：</strong>连续10个已完成订单都满足以下条件：
+                            </p>
+                            <ul class="mb-0 ms-4">
+                                <li>没有超时归还</li>
+                                <li>没有不诚信的异地还车行为</li>
+                            </ul>
+                        </div>
+                        <div class="text-center">
+                            <h3 class="text-primary mb-0">{{ vip_upgrade_info.consecutive_count }}/10</h3>
+                            <small class="text-muted">连续诚信订单</small>
+                            <p class="mb-0 mt-2">
+                                <small class="text-muted">还需 {{ vip_upgrade_info.remaining }} 个订单</small>
+                            </p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 统计与历史（竖向堆叠在客户信息下方） -->
+    <div class="col-12 section-narrow">
+        <!-- 租赁统计 -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>租赁统计</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4 text-center">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="p-3 border rounded">
+                            <h3 class="text-primary mb-2">{{ total_rentals }}</h3>
+                            <p class="text-muted mb-0"><i class="bi bi-cart-check me-1"></i>总租赁次数</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="p-3 border rounded">
+                            <h3 class="text-success mb-2">¥{{ total_amount }}</h3>
+                            <p class="text-muted mb-0"><i class="bi bi-cash-stack me-1"></i>总消费金额</p>
+                        </div>
+                    </div>
+                    {% if customer.member_level == 'VIP' and vip_discount_amount > 0 %}
+                    <div class="col-lg-3 col-md-6">
+                        <div class="p-3 border rounded">
+                            <h3 class="text-warning mb-2">¥{{ vip_discount_amount|floatformat:2 }}</h3>
+                            <p class="text-muted mb-0"><i class="bi bi-piggy-bank me-1"></i>VIP优惠累计</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if status_stats %}
+                    <div class="col-12">
+                        <div class="p-4 border rounded bg-light">
+                            <h6 class="text-primary fw-bold mb-3"><i class="bi bi-pie-chart me-2"></i>租赁订单按状态统计</h6>
+                            <div class="row g-3">
+                                {% for stat in status_stats %}
+                                <div class="col-lg-3 col-md-6">
+                                    <div class="p-3 bg-white border rounded text-center">
+                                        <div class="mb-2">
+                                            {% if stat.status == 'PENDING' %}
+                                                <span class="badge bg-info">预订中</span>
+                                            {% elif stat.status == 'ONGOING' %}
+                                                <span class="badge bg-warning">进行中</span>
+                                            {% elif stat.status == 'COMPLETED' %}
+                                                <span class="badge bg-success">已完成</span>
+                                            {% elif stat.status == 'CANCELLED' %}
+                                                <span class="badge bg-secondary">已取消</span>
+                                            {% endif %}
+                                        </div>
+                                        <h3 class="mb-0">{{ stat.count }}</h3>
+                                        <small class="text-muted">个订单</small>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 租赁历史记录 -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>租赁历史记录</h5>
+                <span class="badge bg-white text-info">{{ rentals|length }} 条记录</span>
+            </div>
+            <div class="card-body p-0">
+                {% if rentals %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>车辆信息</th>
+                                <th>租赁日期</th>
+                                <th>租期</th>
+                                <th>金额</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rental in rentals %}
+                            <tr>
+                                <td>
+                                    <div>
+                                        <strong>{{ rental.vehicle.brand }} {{ rental.vehicle.model }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ rental.vehicle.license_plate }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>
+                                        <i class="bi bi-calendar3"></i> {{ rental.start_date|date:"m-d" }}
+                                        <span class="text-muted">至</span>
+                                        <br>
+                                        <small class="text-muted">{{ rental.end_date|date:"m-d" }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">{{ rental.rental_days }} 天</span>
+                                </td>
+                                <td>
+                                    <span class="text-success">¥{{ rental.total_amount }}</span>
+                                </td>
+                                <td>
+                                    {% if rental.status == 'COMPLETED' %}
+                                        <span class="badge bg-success">已完成</span>
+                                    {% elif rental.status == 'ONGOING' %}
+                                        <span class="badge bg-warning">进行中</span>
+                                    {% elif rental.status == 'PENDING' %}
+                                        <span class="badge bg-info">预订中</span>
+                                    {% elif rental.status == 'CANCELLED' %}
+                                        <span class="badge bg-secondary">已取消</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="#" class="btn btn-sm btn-outline-primary" title="查看详情">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="text-muted mt-3">暂无租赁记录</h5>
+                    <p class="text-muted">{{ customer.name }} 还没有任何租赁记录</p>
+                    <a href="#" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> 创建租赁订单
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 删除确认按钮 -->
+<div class="mt-4">
+    <button type="button" class="btn btn-outline-danger" 
+            onclick="if(confirmDelete('确定要删除客户 {{ customer.name }} 吗？此操作将同时删除相关的所有租赁记录！')) window.location.href='{% url 'customers:customer_delete' customer.pk %}'">
+        <i class="bi bi-trash"></i> 删除客户
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateMembership(customerId, newLevel) {
+    if (!confirm(`确定要将客户会员等级更改为${newLevel === 'VIP' ? 'VIP会员' : '普通会员'}吗？`)) {
+        // 恢复原选择
+        location.reload();
+        return;
+    }
+    
+    fetch(`/customers/${customerId}/membership/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({
+            member_level: newLevel
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', data.message);
+        } else {
+            showAlert('error', data.error || '更新失败，请重试。');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('error', '网络错误，请重试。');
+        location.reload();
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

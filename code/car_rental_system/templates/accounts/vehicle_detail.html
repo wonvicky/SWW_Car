@@ -1,0 +1,234 @@
+{% extends "base_user.html" %}
+{% load static %}
+
+{% block title %}{{ vehicle.brand }} {{ vehicle.model }} - 租车管理系统{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'accounts:home' %}" class="btn btn-outline-secondary mb-3">
+        <i class="fas fa-arrow-left me-2"></i>返回车辆列表
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-car me-2"></i>{{ vehicle.brand }} {{ vehicle.model }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="40%">车牌号：</th>
+                                <td><strong>{{ vehicle.license_plate }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th>品牌：</th>
+                                <td>{{ vehicle.brand }}</td>
+                            </tr>
+                            <tr>
+                                <th>型号：</th>
+                                <td>{{ vehicle.model }}</td>
+                            </tr>
+                            <tr>
+                                <th>类型：</th>
+                                <td>{{ vehicle.vehicle_type }}</td>
+                            </tr>
+                            <tr>
+                                <th>颜色：</th>
+                                <td>{{ vehicle.color }}</td>
+                            </tr>
+                            <tr>
+                                <th>座位数：</th>
+                                <td><span class="badge bg-info">{{ vehicle.seats }}座</span></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-center">
+                            <div class="pricing-box p-4 bg-light rounded">
+                                <h3 class="text-primary mb-0">¥{{ vehicle.daily_rate|floatformat:2 }}</h3>
+                                <p class="text-muted mb-0">日租金</p>
+                            </div>
+                        </div>
+                        {% if review_stats.total > 0 %}
+                        <div class="text-center mt-3">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="h4 mb-1 text-warning">
+                                    {% if review_stats.average_rating %}
+                                        {{ review_stats.average_rating|floatformat:1 }}
+                                    {% else %}
+                                        0.0
+                                    {% endif %}
+                                    <i class="fas fa-star text-warning"></i>
+                                </div>
+                                <div class="text-muted small">({{ review_stats.total|default:0 }}条评价)</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>状态：</strong>
+                    {% if vehicle.status == 'AVAILABLE' %}
+                        <span class="badge bg-success">可用</span> - 该车辆目前可以租用
+                    {% elif vehicle.status == 'RENTED' %}
+                        <span class="badge bg-warning">已租</span> - 该车辆已被租出
+                    {% elif vehicle.status == 'MAINTENANCE' %}
+                        <span class="badge bg-secondary">维修中</span> - 该车辆正在维修
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 车辆评价 -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-star me-2"></i>用户评价
+                </h5>
+                {% if review_stats.total > 0 %}
+                <div class="d-flex align-items-center gap-3">
+                    <div class="text-center">
+                        <div class="h4 mb-0 text-warning">
+                            {% if review_stats.average_rating %}
+                                {{ review_stats.average_rating|floatformat:1 }}
+                            {% else %}
+                                0.0
+                            {% endif %}
+                            <i class="fas fa-star text-warning"></i>
+                        </div>
+                        <small class="text-muted">平均评分</small>
+                    </div>
+                    <div class="text-center">
+                        <div class="h4 mb-0 text-primary">{{ review_stats.total|default:0 }}</div>
+                        <small class="text-muted">评价总数</small>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if review_stats.total > 0 %}
+                    <!-- 评分分布 -->
+                    {% if rating_distribution %}
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-chart-bar me-2"></i>评分分布
+                        </h6>
+                        {% for dist in rating_distribution %}
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="flex-shrink-0" style="width: 50px;">
+                                <span class="text-muted">{{ dist.rating }}星</span>
+                            </div>
+                            <div class="flex-grow-1 mx-3">
+                                <div class="progress" style="height: 20px;">
+                                    {% if dist.percentage > 0 %}
+                                    <div class="progress-bar bg-warning" role="progressbar" 
+                                         style="width: {{ dist.percentage }}%">
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0" style="width: 40px; text-align: right;">
+                                <span class="text-muted small">{{ dist.count }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- 最近评价列表 -->
+                    <div>
+                        <h6 class="mb-3">
+                            <i class="fas fa-comments me-2"></i>最近评价
+                        </h6>
+                        {% for review in recent_reviews %}
+                        <div class="border rounded p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <strong class="text-primary">{{ review.user.username }}</strong>
+                                    <span class="text-muted small ms-2">{{ review.created_at|date:"Y-m-d H:i" }}</span>
+                                </div>
+                                <div>
+                                    {% for i in "12345"|make_list %}
+                                        {% if forloop.counter <= review.rating %}
+                                            <i class="fas fa-star text-warning"></i>
+                                        {% else %}
+                                            <i class="far fa-star text-warning"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <span class="text-muted small ms-1">{{ review.rating }}星</span>
+                                </div>
+                            </div>
+                            {% if review.comment %}
+                                <p class="mb-0 text-muted">{{ review.comment }}</p>
+                            {% else %}
+                                <p class="mb-0 text-muted"><em>用户未填写评价内容</em></p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-star fa-3x text-muted mb-3"></i>
+                        <p class="text-muted mb-0">暂无用户评价</p>
+                        <small class="text-muted">成为第一个评价此车辆的用户吧！</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-calendar-check me-2"></i>租车</h5>
+            </div>
+            <div class="card-body">
+                {% if vehicle.status == 'AVAILABLE' %}
+                    {% if user.is_authenticated %}
+                        {% if can_rent %}
+                            <p class="mb-3">您已可以租用此车辆，点击下方按钮创建订单。</p>
+                            <a href="{% url 'accounts:order_create' %}?vehicle={{ vehicle.id }}" 
+                               class="btn btn-primary w-100 mb-2">
+                                <i class="fas fa-handshake me-2"></i>立即租车
+                            </a>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                您需要先完善客户信息才能租车。
+                            </div>
+                            <a href="{% url 'accounts:customer_info' %}" 
+                               class="btn btn-outline-primary w-100">
+                                <i class="fas fa-user-plus me-2"></i>完善客户信息
+                            </a>
+                        {% endif %}
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            请先登录才能租车
+                        </div>
+                        <a href="{% url 'accounts:login' %}" class="btn btn-primary w-100 mb-2">
+                            <i class="fas fa-sign-in-alt me-2"></i>登录
+                        </a>
+                        <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-user-plus me-2"></i>注册
+                        </a>
+                    {% endif %}
+                {% else %}
+                    <div class="alert alert-secondary">
+                        <i class="fas fa-ban me-2"></i>
+                        该车辆暂时无法租用
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

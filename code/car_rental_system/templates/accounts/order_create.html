@@ -1,0 +1,842 @@
+{% extends "base_user.html" %}
+{% load static %}
+
+{% block title %}创建订单 - 租车管理系统{% endblock %}
+
+{% block content %}
+<div class="profile-fullscreen">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1">
+                <i class="fas fa-handshake me-2"></i>创建租车订单
+            </h1>
+            <p class="text-muted mb-0">请填写订单信息</p>
+        </div>
+        <a href="{% url 'accounts:home' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>返回车辆列表
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-invoice me-2"></i>订单信息
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- 客户信息（隐藏，自动填充） -->
+                        {% if form.customer %}
+                            <div class="mb-3" style="display: none;">
+                                {{ form.customer }}
+                            </div>
+                            <div class="alert alert-info mb-3">
+                                <i class="fas fa-user me-2"></i>
+                                <strong>客户：</strong>{{ customer.name }} ({{ customer.phone }})
+                            </div>
+                        {% endif %}
+                        
+                        <!-- 车辆信息 -->
+                        <div class="mb-4">
+                            <label for="{{ form.vehicle.id_for_label }}" class="form-label fw-semibold">
+                                {{ form.vehicle.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.vehicle }}
+                            {% if form.vehicle.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.vehicle.errors.0 }}
+                                </div>
+                            {% endif %}
+                            {% if form.vehicle.help_text %}
+                                <div class="form-text">{{ form.vehicle.help_text }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 租赁日期 -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="{{ form.start_date.id_for_label }}" class="form-label fw-semibold">
+                                    {{ form.start_date.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.start_date }}
+                                {% if form.start_date.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ form.start_date.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="{{ form.end_date.id_for_label }}" class="form-label fw-semibold">
+                                    {{ form.end_date.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.end_date }}
+                                {% if form.end_date.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ form.end_date.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- 押金与异地还车费用由系统自动计算 -->
+                        <div class="mb-4">
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-calculator me-2"></i>
+                                押金与异地还车费用将根据车辆日租金自动计算，无需手动填写。
+                            </div>
+                            <div style="display: none;">
+                                {{ form.deposit }}
+                                {{ form.cross_location_fee }}
+                            </div>
+                        </div>
+
+                        <!-- 取车地点 -->
+                        <div class="mb-4">
+                            <label for="{{ form.pickup_location.id_for_label }}" class="form-label fw-semibold">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ form.pickup_location.label }} <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                {{ form.pickup_location }}
+                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#pickupStoreSelectModal">
+                                    <i class="fas fa-map"></i>选择门店
+                                </button>
+                            </div>
+                            {% if form.pickup_location.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.pickup_location.errors.0 }}
+                                </div>
+                            {% endif %}
+                            {% if form.pickup_location.help_text %}
+                                <div class="form-text">{{ form.pickup_location.help_text }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 异地还车 -->
+                        <div class="mb-4">
+                            <div class="form-check">
+                                {{ form.is_cross_location_return }}
+                                <label class="form-check-label" for="{{ form.is_cross_location_return.id_for_label }}">
+                                    {{ form.is_cross_location_return.label }}
+                                </label>
+                            </div>
+                            {% if form.is_cross_location_return.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.is_cross_location_return.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 还车地点（异地还车时显示） -->
+                        <div class="mb-4" id="return-location-group" style="display: none;">
+                            <label for="{{ form.return_location.id_for_label }}" class="form-label fw-semibold">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ form.return_location.label }}
+                            </label>
+                            <div class="input-group">
+                                {{ form.return_location }}
+                                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#returnStoreSelectModal">
+                                    <i class="fas fa-map"></i>选择门店
+                                </button>
+                            </div>
+                            <!-- 手动输入框（当选择"其他"时显示） -->
+                            <div id="return-location-manual-input" style="display: none;" class="mt-2">
+                                <input type="text" 
+                                       id="return_location_manual" 
+                                       name="return_location_manual" 
+                                       class="form-control" 
+                                       placeholder="请输入还车地点（非服务门店）"
+                                       maxlength="200">
+                                <div class="form-text text-warning mt-1">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    注意：还车地点不在服务门店范围内，将增加还车费用（为普通异地还车费用的1.5倍）。
+                                </div>
+                            </div>
+                            <!-- 隐藏字段，用于提交实际还车地点值 -->
+                            <input type="hidden" id="return_location_actual" name="return_location_actual" value="">
+                            {% if form.return_location.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.return_location.errors.0 }}
+                                </div>
+                            {% endif %}
+                            {% if form.return_location.help_text %}
+                                <div class="form-text">{{ form.return_location.help_text }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 订单状态（隐藏，自动设置为PENDING） -->
+                        {% if form.status %}
+                            <div style="display: none;">
+                                {{ form.status }}
+                            </div>
+                        {% endif %}
+                        
+                        <!-- 备注 -->
+                        <div class="mb-4">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label fw-semibold">
+                                {{ form.notes.label }}
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.notes.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 表单错误 -->
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                <h6><i class="fas fa-exclamation-triangle me-2"></i>表单验证错误：</h6>
+                                {% for error in form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        <!-- 显示所有字段错误（用于调试） -->
+                        {% if form.errors %}
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-info-circle me-2"></i>请检查以下字段：</h6>
+                                <ul class="mb-0">
+                                    {% for field, errors in form.errors.items %}
+                                        <li>
+                                            <strong>{{ field }}:</strong>
+                                            {% for error in errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- 提交按钮 -->
+                        <div class="d-flex justify-content-end gap-3 mt-4 pt-3 border-top">
+                            <a href="{% url 'accounts:home' %}" class="btn btn-outline-secondary px-4">
+                                <i class="fas fa-times me-2"></i>取消
+                            </a>
+                            <button type="submit" class="btn btn-primary px-5">
+                                <i class="fas fa-check me-2"></i>提交订单
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧信息栏 -->
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>订单说明
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="fas fa-calendar-check text-primary me-2"></i>
+                            <strong>开始日期：</strong>不能早于今天
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-calendar-times text-warning me-2"></i>
+                            <strong>结束日期：</strong>不能早于开始日期
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-car text-success me-2"></i>
+                            <strong>车辆状态：</strong>只能选择可用车辆
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-clock text-info me-2"></i>
+                            <strong>订单状态：</strong>创建后为"待确认"
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            {% if customer %}
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-check me-2"></i>客户信息
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless mb-0">
+                        <tr>
+                            <th width="40%">姓名：</th>
+                            <td>{{ customer.name }}</td>
+                        </tr>
+                        <tr>
+                            <th>手机：</th>
+                            <td>{{ customer.phone }}</td>
+                        </tr>
+                        {% if customer.email %}
+                        <tr>
+                            <th>邮箱：</th>
+                            <td>{{ customer.email }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <th>会员等级：</th>
+                            <td>
+                                {% if customer.member_level == 'VIP' %}
+                                    <span class="badge bg-warning">VIP会员</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">普通会员</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    // 自动计算租赁天数
+    document.addEventListener('DOMContentLoaded', function() {
+        const startDateInput = document.getElementById('{{ form.start_date.id_for_label }}');
+        const endDateInput = document.getElementById('{{ form.end_date.id_for_label }}');
+        
+        function updateDays() {
+            if (startDateInput.value && endDateInput.value) {
+                const start = new Date(startDateInput.value);
+                const end = new Date(endDateInput.value);
+                const diffTime = Math.abs(end - start);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                
+                // 显示天数提示
+                let daysInfo = document.getElementById('days-info');
+                if (!daysInfo) {
+                    daysInfo = document.createElement('div');
+                    daysInfo.id = 'days-info';
+                    daysInfo.className = 'alert alert-info mt-2';
+                    endDateInput.parentElement.appendChild(daysInfo);
+                }
+                daysInfo.innerHTML = `<i class="fas fa-calendar-alt me-2"></i>租赁天数：<strong>${diffDays} 天</strong>`;
+            }
+        }
+        
+        if (startDateInput && endDateInput) {
+            startDateInput.addEventListener('change', updateDays);
+            endDateInput.addEventListener('change', updateDays);
+        }
+        
+        // 异地还车复选框控制
+        const crossLocationCheckbox = document.getElementById('{{ form.is_cross_location_return.id_for_label }}');
+        const returnLocationGroup = document.getElementById('return-location-group');
+        const crossLocationFeeGroup = document.getElementById('cross-location-fee-group');
+        const returnLocationSelect = document.getElementById('{{ form.return_location.id_for_label }}');
+        const returnLocationManualInput = document.getElementById('return-location-manual-input');
+        const returnLocationManual = document.getElementById('return_location_manual');
+        const returnLocationActual = document.getElementById('return_location_actual');
+        
+        if (crossLocationCheckbox && returnLocationGroup) {
+            function toggleCrossLocationFields() {
+                if (crossLocationCheckbox.checked) {
+                    returnLocationGroup.style.display = 'block';
+                    if (crossLocationFeeGroup) {
+                        crossLocationFeeGroup.style.display = 'block';
+                    }
+                } else {
+                    returnLocationGroup.style.display = 'none';
+                    if (crossLocationFeeGroup) {
+                        crossLocationFeeGroup.style.display = 'none';
+                    }
+                    // 重置还车地点相关字段
+                    if (returnLocationSelect) returnLocationSelect.value = '';
+                    if (returnLocationManual) returnLocationManual.value = '';
+                    if (returnLocationActual) returnLocationActual.value = '';
+                    if (returnLocationManualInput) returnLocationManualInput.style.display = 'none';
+                }
+            }
+            
+            crossLocationCheckbox.addEventListener('change', toggleCrossLocationFields);
+            toggleCrossLocationFields(); // 初始化
+        }
+        
+        // 还车地点下拉框变化处理
+        if (returnLocationSelect) {
+            returnLocationSelect.addEventListener('change', function() {
+                const selectedValue = this.value;
+                if (selectedValue === '__OTHER__') {
+                    // 显示手动输入框
+                    if (returnLocationManualInput) {
+                        returnLocationManualInput.style.display = 'block';
+                        if (returnLocationManual) {
+                            returnLocationManual.focus();
+                        }
+                    }
+                    if (returnLocationActual) {
+                        returnLocationActual.value = '';
+                    }
+                } else if (selectedValue) {
+                    // 隐藏手动输入框，设置实际值
+                    if (returnLocationManualInput) {
+                        returnLocationManualInput.style.display = 'none';
+                    }
+                    if (returnLocationManual) {
+                        returnLocationManual.value = '';
+                    }
+                    if (returnLocationActual) {
+                        returnLocationActual.value = selectedValue;
+                    }
+                } else {
+                    // 清空选择
+                    if (returnLocationManualInput) {
+                        returnLocationManualInput.style.display = 'none';
+                    }
+                    if (returnLocationManual) {
+                        returnLocationManual.value = '';
+                    }
+                    if (returnLocationActual) {
+                        returnLocationActual.value = '';
+                    }
+                }
+            });
+            
+            // 手动输入框变化处理
+            if (returnLocationManual) {
+                returnLocationManual.addEventListener('input', function() {
+                    if (returnLocationActual) {
+                        returnLocationActual.value = this.value.trim();
+                    }
+                });
+            }
+        }
+        
+        // 表单提交前，确保还车地点值正确设置
+        const orderForm = document.querySelector('form[method="post"]');
+        if (orderForm) {
+            orderForm.addEventListener('submit', function(e) {
+                // 如果勾选了异地还车，需要验证还车地点
+                if (crossLocationCheckbox && crossLocationCheckbox.checked) {
+                    const selectedValue = returnLocationSelect ? returnLocationSelect.value : '';
+                    if (selectedValue === '__OTHER__') {
+                        // 如果选择"其他"，使用手动输入的值
+                        const manualValue = returnLocationManual ? returnLocationManual.value.trim() : '';
+                        if (!manualValue) {
+                            e.preventDefault();
+                            alert('请填写还车地点');
+                            return false;
+                        }
+                        if (returnLocationActual) {
+                            returnLocationActual.value = manualValue;
+                        }
+                        // 确保隐藏字段有值
+                        if (returnLocationSelect) {
+                            returnLocationSelect.value = '__OTHER__';
+                        }
+                    } else if (selectedValue) {
+                        // 如果选择了服务门店，使用选择的值
+                        if (returnLocationActual) {
+                            returnLocationActual.value = selectedValue;
+                        }
+                    } else {
+                        e.preventDefault();
+                        alert('请选择或填写还车地点');
+                        return false;
+                    }
+                } else {
+                    // 如果没有勾选异地还车，清空还车地点相关字段
+                    if (returnLocationActual) {
+                        returnLocationActual.value = '';
+                    }
+                    if (returnLocationSelect) {
+                        returnLocationSelect.value = '';
+                    }
+                    if (returnLocationManual) {
+                        returnLocationManual.value = '';
+                    }
+                }
+            });
+        }
+    });
+</script>
+
+<!-- 取车门店选择模态框 -->
+<div class="modal fade" id="pickupStoreSelectModal" tabindex="-1" aria-labelledby="pickupStoreSelectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pickupStoreSelectModalLabel">
+                    <i class="fas fa-map-marker-alt me-2"></i>选择取车门店
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <label for="pickupDistrictSelect" class="form-label fw-semibold">
+                        <i class="fas fa-city me-2"></i>选择区域
+                    </label>
+                    <select id="pickupDistrictSelect" class="form-select">
+                        <option value="">请选择区域</option>
+                        {% for district in districts %}
+                        <option value="{{ district }}">{{ district }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="pickupStoreSelect" class="form-label fw-semibold">
+                        <i class="fas fa-store me-2"></i>选择门店
+                    </label>
+                    <select id="pickupStoreSelect" class="form-select" disabled>
+                        <option value="">请先选择区域</option>
+                    </select>
+                </div>
+                
+                <div id="pickupStoreInfo" class="alert alert-light mb-4" style="display: none; background: var(--bg-light); border: 1px solid var(--border-color);">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1" style="color: var(--primary-color);"></i>
+                        已选择：<span id="selectedPickupStoreName" class="fw-semibold" style="color: var(--text-primary);"></span>
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i>取消
+                </button>
+                <button type="button" class="btn btn-primary ms-2" onclick="confirmPickupStoreSelection()">
+                    <i class="fas fa-check"></i>确认选择
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script>
+// 取车门店数据
+const pickupStoreData = {
+    {% for district, stores in store_locations.items %}
+    "{{ district }}": [
+        {% for store in stores %}
+        "{{ store }}"{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+// 区域选择变化时更新门店列表
+$('#pickupDistrictSelect').on('change', function() {
+    const selectedDistrict = $(this).val();
+    const storeSelect = $('#pickupStoreSelect');
+    
+    if (selectedDistrict && pickupStoreData[selectedDistrict]) {
+        // 启用门店下拉框
+        storeSelect.prop('disabled', false);
+        storeSelect.html('<option value="">请选择门店</option>');
+        
+        // 填充该区的门店
+        pickupStoreData[selectedDistrict].forEach(function(store) {
+            storeSelect.append(`<option value="${store}">${store}</option>`);
+        });
+        
+        $('#pickupStoreInfo').hide();
+    } else {
+        // 禁用门店下拉框
+        storeSelect.prop('disabled', true);
+        storeSelect.html('<option value="">请先选择区域</option>');
+        $('#pickupStoreInfo').hide();
+    }
+});
+
+// 门店选择变化时
+$('#pickupStoreSelect').on('change', function() {
+    const selectedStore = $(this).val();
+    if (selectedStore) {
+        $('#selectedPickupStoreName').text(selectedStore);
+        $('#pickupStoreInfo').show();
+    } else {
+        $('#pickupStoreInfo').hide();
+    }
+});
+
+// 确认选择取车门店
+function confirmPickupStoreSelection() {
+    const selectedStore = $('#pickupStoreSelect').val();
+    if (selectedStore) {
+        $('#id_pickup_location').val(selectedStore);
+        // 使用Bootstrap 5原生API关闭模态框
+        const modalElement = document.getElementById('pickupStoreSelectModal');
+        if (typeof bootstrap !== 'undefined') {
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+            if (modalInstance) {
+                modalInstance.hide();
+            } else {
+                const bsModal = new bootstrap.Modal(modalElement);
+                bsModal.hide();
+            }
+        } else {
+            modalElement.classList.remove('show');
+            document.body.classList.remove('modal-open');
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) backdrop.remove();
+        }
+        // 重置下拉框状态
+        $('#pickupDistrictSelect').val('');
+        $('#pickupStoreSelect').prop('disabled', true).html('<option value="">请先选择区域</option>');
+        $('#pickupStoreInfo').hide();
+    } else {
+        alert('请先选择门店');
+    }
+}
+
+// 模态框打开时重置下拉框
+document.addEventListener('DOMContentLoaded', function() {
+    const modalElement = document.getElementById('pickupStoreSelectModal');
+    if (modalElement) {
+        modalElement.addEventListener('show.bs.modal', function() {
+            $('#pickupDistrictSelect').val('');
+            $('#pickupStoreSelect').prop('disabled', true).html('<option value="">请先选择区域</option>');
+            $('#pickupStoreInfo').hide();
+        });
+    }
+});
+</script>
+
+<!-- 还车门店选择模态框 -->
+<div class="modal fade" id="returnStoreSelectModal" tabindex="-1" aria-labelledby="returnStoreSelectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="returnStoreSelectModalLabel">
+                    <i class="fas fa-map-marker-alt me-2"></i>选择还车门店
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <label for="returnDistrictSelect" class="form-label fw-semibold">
+                        <i class="fas fa-city me-2"></i>选择区域
+                    </label>
+                    <select id="returnDistrictSelect" class="form-select">
+                        <option value="">请选择区域</option>
+                        {% for district in districts %}
+                        <option value="{{ district }}">{{ district }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="returnStoreSelect" class="form-label fw-semibold">
+                        <i class="fas fa-store me-2"></i>选择门店
+                    </label>
+                    <select id="returnStoreSelect" class="form-select" disabled>
+                        <option value="">请先选择区域</option>
+                    </select>
+                </div>
+                
+                <div id="returnStoreInfo" class="alert alert-light mb-4" style="display: none; background: var(--bg-light); border: 1px solid var(--border-color);">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1" style="color: var(--primary-color);"></i>
+                        已选择：<span id="selectedReturnStoreName" class="fw-semibold" style="color: var(--text-primary);"></span>
+                    </small>
+                </div>
+                
+                <!-- 其他还车地点选项（手动填写） -->
+                <div class="mb-3">
+                    <div class="border-top pt-3 mb-3"></div>
+                    <div class="alert alert-warning border-warning mb-2" style="border-width: 2px !important;">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-exclamation-triangle fa-lg me-2" style="color: #856404;"></i>
+                            <strong style="color: #856404;">其他还车地点</strong>
+                        </div>
+                        <small class="text-muted d-block mb-2" style="color: #856404;">
+                            如果还车地点不在服务门店范围内，请选择此选项手动填写
+                        </small>
+                        <small class="text-danger d-block">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>注意：</strong>选择其他地点将增加还车费用（为普通异地还车费用的1.5倍）
+                        </small>
+                    </div>
+                    <button type="button" 
+                            class="btn btn-warning w-100 fw-bold py-3" 
+                            onclick="selectOtherReturnLocation()"
+                            style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); border: none; box-shadow: 0 4px 6px rgba(255, 193, 7, 0.3); transition: all 0.3s ease;"
+                            onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 12px rgba(255, 193, 7, 0.4)';"
+                            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(255, 193, 7, 0.3)';">
+                        <i class="fas fa-edit me-2"></i>
+                        点击手动填写其他还车地点
+                        <i class="fas fa-arrow-right ms-2"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i>取消
+                </button>
+                <button type="button" class="btn btn-primary ms-2" onclick="confirmReturnStoreSelection()">
+                    <i class="fas fa-check"></i>确认选择
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 还车门店数据（与取车门店相同）
+const returnStoreData = {
+    {% for district, stores in store_locations.items %}
+    "{{ district }}": [
+        {% for store in stores %}
+        "{{ store }}"{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+// 区域选择变化时更新门店列表
+$('#returnDistrictSelect').on('change', function() {
+    const selectedDistrict = $(this).val();
+    const storeSelect = $('#returnStoreSelect');
+    
+    if (selectedDistrict && returnStoreData[selectedDistrict]) {
+        // 启用门店下拉框
+        storeSelect.prop('disabled', false);
+        storeSelect.html('<option value="">请选择门店</option>');
+        
+        // 填充该区的门店
+        returnStoreData[selectedDistrict].forEach(function(store) {
+            storeSelect.append(`<option value="${store}">${store}</option>`);
+        });
+        
+        $('#returnStoreInfo').hide();
+    } else {
+        // 禁用门店下拉框
+        storeSelect.prop('disabled', true);
+        storeSelect.html('<option value="">请先选择区域</option>');
+        $('#returnStoreInfo').hide();
+    }
+});
+
+// 门店选择变化时
+$('#returnStoreSelect').on('change', function() {
+    const selectedStore = $(this).val();
+    if (selectedStore) {
+        $('#selectedReturnStoreName').text(selectedStore);
+        $('#returnStoreInfo').show();
+    } else {
+        $('#returnStoreInfo').hide();
+    }
+});
+
+// 确认选择还车门店
+function confirmReturnStoreSelection() {
+    const selectedStore = $('#returnStoreSelect').val();
+    if (selectedStore) {
+        const returnLocationSelect = document.getElementById('{{ form.return_location.id_for_label }}');
+        const returnLocationActual = document.getElementById('return_location_actual');
+        const returnLocationManualInput = document.getElementById('return-location-manual-input');
+        const returnLocationManual = document.getElementById('return_location_manual');
+        
+        if (returnLocationSelect) {
+            returnLocationSelect.value = selectedStore;
+            // 触发change事件
+            returnLocationSelect.dispatchEvent(new Event('change'));
+        }
+        
+        if (returnLocationActual) {
+            returnLocationActual.value = selectedStore;
+        }
+        
+        // 隐藏手动输入框
+        if (returnLocationManualInput) {
+            returnLocationManualInput.style.display = 'none';
+        }
+        if (returnLocationManual) {
+            returnLocationManual.value = '';
+        }
+        
+        // 使用Bootstrap 5原生API关闭模态框
+        const modalElement = document.getElementById('returnStoreSelectModal');
+        if (typeof bootstrap !== 'undefined') {
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+            if (modalInstance) {
+                modalInstance.hide();
+            } else {
+                const bsModal = new bootstrap.Modal(modalElement);
+                bsModal.hide();
+            }
+        } else {
+            modalElement.classList.remove('show');
+            document.body.classList.remove('modal-open');
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) backdrop.remove();
+        }
+        // 重置下拉框状态
+        $('#returnDistrictSelect').val('');
+        $('#returnStoreSelect').prop('disabled', true).html('<option value="">请先选择区域</option>');
+        $('#returnStoreInfo').hide();
+    } else {
+        alert('请先选择门店');
+    }
+}
+
+// 选择其他还车地点（手动填写）
+function selectOtherReturnLocation() {
+    const returnLocationSelect = document.getElementById('{{ form.return_location.id_for_label }}');
+    const returnLocationManualInput = document.getElementById('return-location-manual-input');
+    const returnLocationManual = document.getElementById('return_location_manual');
+    
+    // 设置下拉框为"其他"
+    if (returnLocationSelect) {
+        returnLocationSelect.value = '__OTHER__';
+        // 触发change事件
+        returnLocationSelect.dispatchEvent(new Event('change'));
+    }
+    
+    // 显示手动输入框并聚焦
+    if (returnLocationManualInput) {
+        returnLocationManualInput.style.display = 'block';
+        setTimeout(function() {
+            if (returnLocationManual) {
+                returnLocationManual.focus();
+            }
+        }, 300);
+    }
+    
+    // 关闭模态框
+    const modalElement = document.getElementById('returnStoreSelectModal');
+    if (typeof bootstrap !== 'undefined') {
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) {
+            modalInstance.hide();
+        } else {
+            const bsModal = new bootstrap.Modal(modalElement);
+            bsModal.hide();
+        }
+    } else {
+        modalElement.classList.remove('show');
+        document.body.classList.remove('modal-open');
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.remove();
+    }
+    
+    // 重置下拉框状态
+    $('#returnDistrictSelect').val('');
+    $('#returnStoreSelect').prop('disabled', true).html('<option value="">请先选择区域</option>');
+    $('#returnStoreInfo').hide();
+}
+
+// 还车门店模态框打开时重置下拉框
+document.addEventListener('DOMContentLoaded', function() {
+    const modalElement = document.getElementById('returnStoreSelectModal');
+    if (modalElement) {
+        modalElement.addEventListener('show.bs.modal', function() {
+            $('#returnDistrictSelect').val('');
+            $('#returnStoreSelect').prop('disabled', true).html('<option value="">请先选择区域</option>');
+            $('#returnStoreInfo').hide();
+        });
+    }
+});
+</script>
+{% endblock %}
