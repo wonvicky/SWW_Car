@@ -123,10 +123,10 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
-# 默认主页面 - 统一登录界面
-LOGIN_URL = '/accounts/login/'  # 统一登录页面
-LOGIN_REDIRECT_URL = '/'  # 登录后由视图根据权限判断重定向
-LOGOUT_REDIRECT_URL = '/accounts/login/'
+# 认证配置 - 确保未登录用户首先看到登录界面
+LOGIN_URL = '/accounts/login/'  # 未登录用户重定向到登录页面
+LOGIN_REDIRECT_URL = '/'  # 登录成功后跳转到首页（由home_redirect智能分发）
+LOGOUT_REDIRECT_URL = '/accounts/login/'  # 登出后跳转到登录页面
 
 # 错误页面配置
 HANDLER404 = 'views.page_not_found'

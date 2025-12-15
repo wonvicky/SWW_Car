@@ -297,7 +297,7 @@ def rental_return(request, pk):
         return redirect('rentals:rental_detail', pk=rental.pk)
     
     if request.method == 'POST':
-        form = ReturnForm(request.POST)
+        form = ReturnForm(request.POST, rental=rental)
         if form.is_valid():
             actual_return_date = form.cleaned_data['actual_return_date']
             actual_return_location = form.cleaned_data.get('actual_return_location', '').strip() or None
@@ -328,14 +328,38 @@ def rental_return(request, pk):
                         rental.is_cross_location_return = True
                         rental.return_location = actual_return_location
                 
-                # 计算超时还车费用
+                # 根据实际租车时间重新计算租金
+                actual_days = (actual_return_date - rental.start_date).days + 1
+                planned_days = (rental.end_date - rental.start_date).days + 1
+                
+                # 计算实际应付租金（根据实际天数）
+                actual_base_amount = rental.vehicle.daily_rate * Decimal(str(actual_days))
+                
+                # VIP折扣
+                if rental.customer.member_level == 'VIP':
+                    actual_discount = actual_base_amount * Decimal('0.10')
+                    actual_total_amount = actual_base_amount - actual_discount
+                else:
+                    actual_total_amount = actual_base_amount
+                
+                # 计算费用差额（提前还车或超时还车）
+                original_total_amount = rental.total_amount or Decimal('0.00')
+                amount_difference = actual_total_amount - original_total_amount
+                
+                # 更新订单租金为实际租金
+                rental.total_amount = actual_total_amount
+                
+                # 计算超时还车费用（如果需要）
                 overdue_fee = Decimal('0.00')
                 if actual_return_date > rental.end_date:
-                    # 超期租赁，计算超时费用
+                    # 超期租赁，超时费用已经包含在 actual_total_amount 中
+                    # 但我们仍然记录超时天数和费用供显示
                     extra_days = (actual_return_date - rental.end_date).days
-                    # 超时费用按日租金计算（可根据实际业务调整，如1.5倍日租金）
                     overdue_fee = rental.vehicle.daily_rate * Decimal(str(extra_days))
                     rental.overdue_fee = overdue_fee
+                else:
+                    # 没有超时，清零超时费用
+                    rental.overdue_fee = Decimal('0.00')
                 
                 # 更新订单状态为已完成
                 rental.status = 'COMPLETED'
@@ -369,18 +393,22 @@ def rental_return(request, pk):
                     if is_eligible:
                         vip_upgraded = rental.customer.upgrade_to_vip()
                 
-                # 构建成功消息
+                 # 构建成功消息
                 fee_details = []
+                fee_details.append(f'实际租赁{actual_days}天，租金：¥{actual_total_amount:.2f}')
+                if amount_difference != 0:
+                    if amount_difference > 0:
+                        fee_details.append(f'超期补交：¥{amount_difference:.2f}')
+                    else:
+                        fee_details.append(f'提前还车退费：¥{-amount_difference:.2f}')
                 if cross_location_fee_to_add > 0:
                     fee_details.append(f'异地还车费用：¥{cross_location_fee_to_add:.2f}')
-                if overdue_fee > 0:
-                    fee_details.append(f'超时还车费用：¥{overdue_fee:.2f}')
                 if deposit_refunded:
                     fee_details.append(f'押金退还：¥{deposit_refund_amount:.2f}')
                 
                 total_fee_message = f'车辆归还成功！订单总额：¥{rental.calculate_order_total():.2f}'
                 if fee_details:
-                    total_fee_message += f'（含：{", ".join(fee_details)}）'
+                    total_fee_message += f'（{"、".join(fee_details)}）'
                 if vip_upgraded:
                     total_fee_message += f' 客户 {rental.customer.name} 由于连续10个订单表现优异，已自动升级为VIP会员！'
                 
@@ -388,7 +416,7 @@ def rental_return(request, pk):
                 return redirect('rentals:rental_detail', pk=rental.pk)
     else:
         # 设置默认还车门店为取车门店
-        form = ReturnForm(initial={
+        form = ReturnForm(rental=rental, initial={
             'actual_return_location': rental.pickup_location
         })
     

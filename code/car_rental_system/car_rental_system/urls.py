@@ -26,8 +26,8 @@ from views import review_list_view, review_edit_view, review_delete_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', dashboard, name='dashboard'),
-    path('home/', home_redirect, name='home'),
+    path('', home_redirect, name='home'),  # 智能首页，根据用户身份跳转
+    path('dashboard/', dashboard, name='dashboard'),  # 管理员仪表板
     path('reviews/', review_list_view, name='review_list'),
     path('reviews/<int:pk>/edit/', review_edit_view, name='review_edit'),
     path('reviews/<int:pk>/delete/', review_delete_view, name='review_delete'),

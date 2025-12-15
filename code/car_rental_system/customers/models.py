@@ -77,6 +77,11 @@ class Customer(models.Model):
         default='NORMAL',
         help_text='客户会员等级'
     )
+    credit_score = models.PositiveIntegerField(
+        '信用评分',
+        default=100,
+        help_text='客户信用评分（0-100，初始100，用于押金计算）'
+    )
     created_at = models.DateTimeField(
         '创建时间',
         auto_now_add=True

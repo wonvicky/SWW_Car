@@ -250,13 +250,12 @@ class Rental(models.Model):
             rental_days = (self.end_date - self.start_date).days + 1
             self.total_amount = self.vehicle.daily_rate * rental_days
         
-        # VIP用户不需要押金，普通用户需要押金
-        if self.customer and self.customer.member_level == 'VIP':
-            # VIP用户押金为0
-            self.deposit = Decimal('0.00')
-        elif self.deposit == Decimal('0.00') and self.vehicle:
-            # 普通用户默认押金为日租金的10倍（可根据实际业务调整）
-            self.deposit = self.vehicle.daily_rate * Decimal('10')
+        # 使用动态押金计算机制
+        if self.customer and self.vehicle and self.start_date and self.end_date:
+            # 如果押金为0且还没有设置，计算动态押金
+            if self.deposit == Decimal('0.00'):
+                dynamic_deposit, deposit_details = self.calculate_dynamic_deposit()
+                self.deposit = dynamic_deposit
         
         # 如果设置了异地还车，但还车地点为空，则使用取车地点
         if self.is_cross_location_return and not self.return_location:
@@ -278,10 +277,102 @@ class Rental(models.Model):
     
     @property
     def rental_days(self):
-        """计算租赁天数"""
+        """计算租赁天数（预订天数）"""
         if self.start_date and self.end_date:
             return (self.end_date - self.start_date).days + 1
         return 0
+    
+    @property
+    def actual_rental_days(self):
+        """
+        计算实际租赁天数
+        如果已还车，根据实际还车日期计算；否则使用预订天数
+        """
+        if self.actual_return_date and self.start_date:
+            return (self.actual_return_date - self.start_date).days + 1
+        return self.rental_days
+    
+    def calculate_dynamic_deposit(self):
+        """
+        动态计算押金金额
+        根据以下因素综合计算：
+        1. 车辆价值：车辆越贵，押金越高
+        2. 租赁时长：租期越长，风险系数越大
+        3. 客户信用：信用越高，押金折扣越多
+        4. 会员等级：VIP免押金
+        
+        计算公式：
+        基础押金 = 车辆价值 * 基础押金率（0.05）
+        时长系数 = 1 + (min(租赁天数, 30) - 1) * 0.01  （0-30天，每天增加1%）
+        信用折扣 = 信用评分 / 100  （0.0-1.0）
+        最终押金 = 基础押金 * 时长系数 * (2 - 信用折扣)
+        
+        返回：(押金金额, 计算明细字典)
+        """
+        if not self.vehicle or not self.customer:
+            return Decimal('0.00'), {}
+        
+        # VIP用户免押金
+        if self.customer.member_level == 'VIP':
+            return Decimal('0.00'), {
+                'base_deposit': Decimal('0.00'),
+                'vehicle_value': getattr(self.vehicle, 'vehicle_value', Decimal('100000.00')),
+                'rental_days': self.rental_days,
+                'duration_factor': Decimal('1.00'),
+                'credit_score': getattr(self.customer, 'credit_score', 100),
+                'credit_discount': Decimal('1.00'),
+                'final_deposit': Decimal('0.00'),
+                'reason': 'VIP会员享受免押金优惠'
+            }
+        
+        # 获取车辆价值（如果没有vehicle_value字段，使用日租金*365作为估算）
+        vehicle_value = getattr(self.vehicle, 'vehicle_value', None)
+        if vehicle_value is None:
+            vehicle_value = self.vehicle.daily_rate * Decimal('365')  # 估算车辆价值
+        
+        # 1. 计算基础押金（车辆价值的5%）
+        base_deposit_rate = Decimal('0.05')
+        base_deposit = vehicle_value * base_deposit_rate
+        
+        # 2. 租赁时长系数（0-30天，每天增加1%，最多30%）
+        rental_days = self.rental_days
+        capped_days = min(rental_days, 30)
+        duration_factor = Decimal('1.00') + (Decimal(str(capped_days)) - Decimal('1')) * Decimal('0.01')
+        
+        # 3. 获取客户信用评分（0-100，初始100）
+        credit_score = getattr(self.customer, 'credit_score', 100)
+        credit_score = max(0, min(100, credit_score))  # 限制0-100
+        
+        # 4. 信用系数（评分越高，系数越小，押金越少）
+        # 公式：2 - (评分/100)  ->  评分98分=1.02x, 评分100分=1.0x, 评刉50分=1.5x, 评刅0分=2.0x
+        credit_discount = Decimal(str(credit_score)) / Decimal('100')
+        credit_factor = Decimal('2.00') - credit_discount
+        
+        # 5. 计算最终押金
+        final_deposit = base_deposit * duration_factor * credit_factor
+        
+        # 6. 设置押金上下限
+        min_deposit = self.vehicle.daily_rate * Decimal('3')  # 最少为3天租金
+        max_deposit = vehicle_value * Decimal('0.15')  # 最多为车辆价值的15%
+        
+        final_deposit = max(min_deposit, min(final_deposit, max_deposit))
+        
+        # 返回计算结果和明细
+        details = {
+            'base_deposit': base_deposit.quantize(Decimal('0.01')),
+            'vehicle_value': vehicle_value.quantize(Decimal('0.01')),
+            'base_deposit_rate': float(base_deposit_rate),
+            'rental_days': rental_days,
+            'duration_factor': duration_factor.quantize(Decimal('0.01')),
+            'credit_score': credit_score,
+            'credit_discount': credit_discount.quantize(Decimal('0.01')),
+            'credit_factor': credit_factor.quantize(Decimal('0.01')),
+            'final_deposit': final_deposit.quantize(Decimal('0.01')),
+            'min_deposit': min_deposit.quantize(Decimal('0.01')),
+            'max_deposit': max_deposit.quantize(Decimal('0.01')),
+        }
+        
+        return final_deposit.quantize(Decimal('0.01')), details
     
     def calculate_order_total(self):
         """计算订单总额（基础租金 + 押金 + 异地费用 + 超时费用）"""

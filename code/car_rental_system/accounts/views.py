@@ -270,40 +270,46 @@ def get_payment_summary(rental, payments=None):
 
 def get_recommended_vehicles(user, limit=6):
     """
-    获取推荐车辆
+    获取推荐车辆（优化版本）
     推荐策略：
-    1. 基于用户历史订单推荐相似车型（相同品牌、类型、座位数等）
-    2. 基于热门车型推荐（租赁次数最多的车型）
-    3. 综合推荐结果
+    1. 优先使用缓存的推荐结果
+    2. 基于用户历史订单推荐相似车型（相同品牌、类型、座位数等）
+    3. 基于热门车型推荐（租赁次数最多的车型）
+    4. 综合推荐结果
     """
+    # 尝试从缓存获取用户的推荐结果
+    cache_key = f'user_recommendations_{user.id}'
+    cached_recommendations = cache.get(cache_key)
+    if cached_recommendations:
+        # 验证缓存的车辆ID是否仍然可用
+        vehicles = Vehicle.objects.filter(id__in=cached_recommendations, status='AVAILABLE')[:limit]
+        if vehicles.count() == limit:
+            return list(vehicles)
+    
     recommended_vehicles = []
     
     # 只推荐可用车辆
-    available_vehicles = Vehicle.objects.filter(status='AVAILABLE')
+    available_vehicles = Vehicle.objects.filter(status='AVAILABLE').only(
+        'id', 'brand', 'model', 'vehicle_type', 'daily_rate', 'seats', 'license_plate', 'color', 'created_at'
+    )
     
     # 策略1：基于用户历史订单的个性化推荐
     customer = get_customer_for_user(user)
     if customer:
-        # 获取用户的历史订单
+        # 获取用户的历史订单（只获取最近5条，减少查询）
         user_rentals = Rental.objects.filter(
             customer=customer,
             status__in=['COMPLETED', 'ONGOING']
-        ).select_related('vehicle').order_by('-created_at')[:10]
+        ).select_related('vehicle').only(
+            'vehicle__brand', 'vehicle__vehicle_type', 'vehicle__seats', 'vehicle_id'
+        ).order_by('-created_at')[:5]
         
         if user_rentals.exists():
             # 分析用户偏好：品牌、类型、座位数
-            preferred_brands = []
-            preferred_types = []
-            preferred_seats = []
-            
-            for rental in user_rentals:
-                vehicle = rental.vehicle
-                if vehicle.brand:
-                    preferred_brands.append(vehicle.brand)
-                if vehicle.vehicle_type:
-                    preferred_types.append(vehicle.vehicle_type)
-                if vehicle.seats:
-                    preferred_seats.append(vehicle.seats)
+            from collections import Counter
+            preferred_brands = [r.vehicle.brand for r in user_rentals if r.vehicle.brand]
+            preferred_types = [r.vehicle.vehicle_type for r in user_rentals if r.vehicle.vehicle_type]
+            preferred_seats = [r.vehicle.seats for r in user_rentals if r.vehicle.seats]
             
             # 根据偏好推荐相似车辆
             if preferred_brands or preferred_types or preferred_seats:
@@ -312,29 +318,24 @@ def get_recommended_vehicles(user, limit=6):
                 
                 # 优先匹配品牌
                 if preferred_brands:
-                    # 获取最常见的品牌
-                    from collections import Counter
                     brand_counter = Counter(preferred_brands)
-                    top_brands = [brand for brand, _ in brand_counter.most_common(2)]
-                    recommendation_query |= Q(brand__in=top_brands)
+                    top_brand = brand_counter.most_common(1)[0][0]
+                    recommendation_query |= Q(brand=top_brand)
                 
                 # 匹配类型
                 if preferred_types:
                     type_counter = Counter(preferred_types)
-                    top_types = [vtype for vtype, _ in type_counter.most_common(2)]
-                    recommendation_query |= Q(vehicle_type__in=top_types)
+                    top_type = type_counter.most_common(1)[0][0]
+                    recommendation_query |= Q(vehicle_type=top_type)
                 
                 # 匹配座位数（允许±1的误差）
                 if preferred_seats:
                     seats_counter = Counter(preferred_seats)
-                    top_seats = [seats for seats, _ in seats_counter.most_common(2)]
-                    seats_query = Q()
-                    for seat in top_seats:
-                        seats_query |= Q(seats__gte=seat-1, seats__lte=seat+1)
-                    recommendation_query |= seats_query
+                    top_seat = seats_counter.most_common(1)[0][0]
+                    recommendation_query |= Q(seats__gte=top_seat-1, seats__lte=top_seat+1)
                 
                 # 获取推荐车辆（排除用户已租过的车辆）
-                rented_vehicle_ids = user_rentals.values_list('vehicle_id', flat=True)
+                rented_vehicle_ids = [r.vehicle_id for r in user_rentals]
                 personalized_vehicles = available_vehicles.filter(
                     recommendation_query
                 ).exclude(id__in=rented_vehicle_ids).distinct()[:limit]
@@ -344,8 +345,8 @@ def get_recommended_vehicles(user, limit=6):
     # 策略2：基于热门车型推荐（如果个性化推荐不足）
     if len(recommended_vehicles) < limit:
         # 获取租赁次数最多的车辆（热门车型）
-        cache_key = 'popular_vehicles'
-        popular_vehicle_ids = cache.get(cache_key)
+        cache_key_popular = 'popular_vehicles'
+        popular_vehicle_ids = cache.get(cache_key_popular)
         
         if popular_vehicle_ids is None:
             # 统计每个车辆的租赁次数
@@ -356,20 +357,22 @@ def get_recommended_vehicles(user, limit=6):
             ).order_by('-rental_count')[:limit*2]
             
             popular_vehicle_ids = [item['vehicle_id'] for item in popular_vehicles]
-            cache.set(cache_key, popular_vehicle_ids, 3600)  # 缓存1小时
+            cache.set(cache_key_popular, popular_vehicle_ids, 3600)  # 缓存1小时
         
         # 获取热门车辆
         if popular_vehicle_ids:
+            existing_ids = [v.id for v in recommended_vehicles]
             popular_vehicles = available_vehicles.filter(
                 id__in=popular_vehicle_ids
-            ).exclude(id__in=[v.id for v in recommended_vehicles])[:limit - len(recommended_vehicles)]
+            ).exclude(id__in=existing_ids)[:limit - len(recommended_vehicles)]
             
             recommended_vehicles.extend(list(popular_vehicles))
     
     # 策略3：如果还是不足，推荐最新添加的车辆
     if len(recommended_vehicles) < limit:
+        existing_ids = [v.id for v in recommended_vehicles]
         new_vehicles = available_vehicles.exclude(
-            id__in=[v.id for v in recommended_vehicles]
+            id__in=existing_ids
         ).order_by('-created_at')[:limit - len(recommended_vehicles)]
         
         recommended_vehicles.extend(list(new_vehicles))
@@ -384,7 +387,13 @@ def get_recommended_vehicles(user, limit=6):
         if len(unique_vehicles) >= limit:
             break
     
-    return unique_vehicles[:limit]
+    result = unique_vehicles[:limit]
+    
+    # 缓存推荐结果（缓存10分钟）
+    if result:
+        cache.set(cache_key, [v.id for v in result], 600)
+    
+    return result
 
 
 @login_required
@@ -600,22 +609,31 @@ def home_view(request):
             seats_options = []
             cache.set(cache_key_seats, seats_options, 300)
     
-    # 商务风格统计信息
-    vehicle_stats_raw = Vehicle.objects.filter(status='AVAILABLE').aggregate(
-        total=Count('id'),
-        avg_rate=Avg('daily_rate')
-    )
-    vehicle_stats = {
-        'total': vehicle_stats_raw['total'] or 0,
-        'avg_rate': (vehicle_stats_raw['avg_rate'] or Decimal('0.00')),
-        'seat_options': len(seats_options)
-    }
-    popular_types = list(
-        Vehicle.objects.filter(status='AVAILABLE')
-        .values_list('vehicle_type', flat=True)
-        .distinct()
-        .order_by('vehicle_type')[:6]
-    )
+    # 商务风格统计信息（使用缓存优化）
+    cache_key_stats = 'home_vehicle_stats'
+    vehicle_stats = cache.get(cache_key_stats)
+    popular_types = cache.get('home_popular_types')
+    
+    if vehicle_stats is None or popular_types is None:
+        vehicle_stats_raw = Vehicle.objects.filter(status='AVAILABLE').aggregate(
+            total=Count('id'),
+            avg_rate=Avg('daily_rate')
+        )
+        vehicle_stats = {
+            'total': vehicle_stats_raw['total'] or 0,
+            'avg_rate': (vehicle_stats_raw['avg_rate'] or Decimal('0.00')),
+            'seat_options': len(seats_options)
+        }
+        popular_types = list(
+            Vehicle.objects.filter(status='AVAILABLE')
+            .values_list('vehicle_type', flat=True)
+            .distinct()
+            .order_by('vehicle_type')[:6]
+        )
+        
+        # 缓存5分钟
+        cache.set(cache_key_stats, vehicle_stats, 300)
+        cache.set('home_popular_types', popular_types, 300)
     
     # 检查用户收藏的车辆ID
     favorite_vehicle_ids = []
@@ -1168,7 +1186,7 @@ def order_return_view(request, pk):
         return redirect('accounts:order_detail', pk=rental.pk)
     
     if request.method == 'POST':
-        form = ReturnForm(request.POST)
+        form = ReturnForm(request.POST, rental=rental)
         if form.is_valid():
             actual_return_date = form.cleaned_data['actual_return_date']
             actual_return_location = form.cleaned_data.get('actual_return_location', '').strip() or None
@@ -1199,14 +1217,38 @@ def order_return_view(request, pk):
                         rental.is_cross_location_return = True
                         rental.return_location = actual_return_location
                 
-                # 计算超时还车费用
+                # 根据实际租车时间重新计算租金
+                actual_days = (actual_return_date - rental.start_date).days + 1
+                planned_days = (rental.end_date - rental.start_date).days + 1
+                
+                # 计算实际应付租金（根据实际天数）
+                actual_base_amount = rental.vehicle.daily_rate * Decimal(str(actual_days))
+                
+                # VIP折扣
+                if rental.customer.member_level == 'VIP':
+                    actual_discount = actual_base_amount * Decimal('0.10')
+                    actual_total_amount = actual_base_amount - actual_discount
+                else:
+                    actual_total_amount = actual_base_amount
+                
+                # 计算费用差额（提前还车或超时还车）
+                original_total_amount = rental.total_amount or Decimal('0.00')
+                amount_difference = actual_total_amount - original_total_amount
+                
+                # 更新订单租金为实际租金
+                rental.total_amount = actual_total_amount
+                
+                # 计算超时还车费用（如果需要）
                 overdue_fee = Decimal('0.00')
                 if actual_return_date > rental.end_date:
-                    # 超期租赁，计算超时费用
+                    # 超期租赁，超时费用已经包含在 actual_total_amount 中
+                    # 但我们仍然记录超时天数和费用供显示
                     extra_days = (actual_return_date - rental.end_date).days
-                    # 超时费用按日租金计算（可根据实际业务调整）
                     overdue_fee = rental.vehicle.daily_rate * Decimal(str(extra_days))
                     rental.overdue_fee = overdue_fee
+                else:
+                    # 没有超时，清零超时费用
+                    rental.overdue_fee = Decimal('0.00')
                 
                 # 更新订单状态为已完成
                 rental.status = 'COMPLETED'
@@ -1270,7 +1312,7 @@ def order_return_view(request, pk):
                 return redirect('accounts:order_detail', pk=rental.pk)
     else:
         # 设置默认还车门店为取车门店
-        form = ReturnForm(initial={
+        form = ReturnForm(rental=rental, initial={
             'actual_return_location': rental.pickup_location
         })
     

@@ -4,17 +4,55 @@
 {% block title %}浏览车辆 - 租车管理系统{% endblock %}
 
 {% block content %}
+<style>
+/* 精选车辆徽章 */
+.recommendation-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #fff5e6 0%, #ffe9cc 100%);
+    border: 1px solid #ffd699;
+    padding: 0.6rem 1.1rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #d48a34;
+    box-shadow: 0 2px 8px rgba(212, 138, 52, 0.15);
+}
+
+.recommendation-badge i {
+    font-size: 1rem;
+}
+
+/* 筛选强调标签 */
+.filter-accent {
+    background: linear-gradient(135deg, rgba(212, 138, 52, 0.12) 0%, rgba(212, 138, 52, 0.08) 100%);
+    border: 1px solid rgba(212, 138, 52, 0.25);
+    color: #c47a2e;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-accent i {
+    font-size: 0.95rem;
+}
+</style>
 <div class="layout-stack">
     <section class="hero-section">
         <div class="hero-copy position-relative">
             <div class="recommendation-badge mb-3 text-dark">
-                <i class="fas fa-briefcase me-2"></i>商务精选
+                <i class="fas fa-car me-2"></i>精选车辆
             </div>
-            <h1>让商务出行更体面</h1>
-            <p>我们提供经过严格筛选与保养的车辆、专属顾问与灵活的租赁方案，满足商务拜访、会议接驳、贵宾接待等多种场景，助你在每一次出行中保持从容。</p>
+            <h1>让每一次出行都更舒心</h1>
+            <p>我们提供经过严格筛选与保养的车辆、专业顾问与灵活的租赁方案，满足商务出差、旅游度假、日常通勤、家庭出游、机场接送等各类出行需求，助您在每一次出行中都能轻松自在。</p>
             <ul class="list-unstyled hero-points mb-3">
                 <li><i class="fas fa-check-circle"></i>车辆按季度全面保养，保证交车状态稳定</li>
-                <li><i class="fas fa-check-circle"></i>商务团队一对一协助，快速响应行程调整</li>
+                <li><i class="fas fa-check-circle"></i>专业团队一对一协助，快速响应行程调整</li>
                 <li><i class="fas fa-check-circle"></i>押金与异地费用自动化结算，账务清晰透明</li>
             </ul>
             <div class="hero-actions">
@@ -58,7 +96,7 @@
         <div class="section-header">
             <div>
                 <div class="section-title"><i class="fas fa-chart-line me-2 text-primary"></i>车队洞察</div>
-                <p class="section-description">实时掌握可用车型、租金区间及热门配置，辅助商务团队快速决策。</p>
+                <p class="section-description">实时掌握可用车型、租金区间及热门配置，帮助您快速找到理想车辆。</p>
             </div>
             {% if popular_types %}
             <div class="d-flex flex-wrap gap-2 justify-content-end">
@@ -82,7 +120,7 @@
             <div class="surface surface--soft">
                 <span class="label text-muted text-uppercase">座位配置</span>
                 <h3 class="mb-1 text-primary">{{ vehicle_stats.seat_options }}</h3>
-                <p class="mb-0 text-muted">覆盖主流商务布局</p>
+                <p class="mb-0 text-muted">覆盖各类出行需求</p>
             </div>
         </div>
     </section>
@@ -113,7 +151,7 @@
                     <ul class="mb-3">
                         <li><i class="fas fa-id-card"></i>{{ vehicle.license_plate }}</li>
                         <li><i class="fas fa-chair"></i>{{ vehicle.seats }} 座</li>
-                        <li><i class="fas fa-palette"></i>{{ vehicle.color|default:"商务色" }}</li>
+                        <li><i class="fas fa-palette"></i>{{ vehicle.color|default:"经典色" }}</li>
                     </ul>
                     <div class="vehicle-meta-line">
                         <span><i class="far fa-clock me-1"></i>优先取车</span>
@@ -190,7 +228,7 @@
         <div class="section-header">
             <div>
                 <div class="section-title"><i class="fas fa-car-side text-primary me-2"></i>全部车辆</div>
-                <p class="section-description">覆盖商务轿车、MPV、行政级 SUV 等多种车型。</p>
+                <p class="section-description">覆盖经济型轿车、商务轿车、MPV、SUV 等多种车型，满足各类出行场景。</p>
             </div>
             <div class="text-muted">共 {{ vehicles.paginator.count }} 辆可预约</div>
         </div>

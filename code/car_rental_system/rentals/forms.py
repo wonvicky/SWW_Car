@@ -341,14 +341,25 @@ class ReturnForm(forms.Form):
         })
     )
     
+    def __init__(self, *args, rental=None, **kwargs):
+        """初始化表单，接收租赁订单对象用于验证"""
+        self.rental = rental
+        super().__init__(*args, **kwargs)
+    
     def clean_actual_return_date(self):
         """验证还车日期"""
         actual_return_date = self.cleaned_data.get('actual_return_date')
         if not actual_return_date:
             raise ValidationError('请选择实际还车日期')
         
+        # 验证还车日期不能晚于今天
         if actual_return_date > date.today():
             raise ValidationError('还车日期不能晚于今天')
+        
+        # 验证还车日期不能早于租车开始日期
+        if self.rental and self.rental.start_date:
+            if actual_return_date < self.rental.start_date:
+                raise ValidationError(f'还车日期不能早于租车开始日期（{self.rental.start_date.strftime("%Y年%m月%d日")}）')
         
         return actual_return_date
     

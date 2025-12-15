@@ -405,7 +405,7 @@
                         </div>
                     {% endif %}
                     <div class="form-text">
-                        还车日期不能晚于今天
+                        还车日期不能晚于今天，也不能早于租车开始日期（{{ rental.start_date|date:"Y年m月d日" }}）
                     </div>
                 </div>
 
@@ -557,22 +557,21 @@ function updateCostPreview() {
     const needsCrossLocationFee = actualIsCrossLocation && !isCrossLocationOriginal;
     
     if (returnDate && startDate && endDate) {
-        const baseDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-        const baseAmount = baseDays * dailyRate;
-        const discount = isVip ? baseAmount * 0.1 : 0;
-        const newAmount = baseAmount - discount;
+        // 根据实际还车日期计算实际租赁天数
+        const actualDays = Math.floor((returnDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+        const plannedDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
         
-        let extraDays = 0;
-        let overdueAmount = 0;
+        // 根据实际天数计算租金
+        const actualBaseAmount = actualDays * dailyRate;
+        const discount = isVip ? actualBaseAmount * 0.1 : 0;
+        const actualAmount = actualBaseAmount - discount;
+        
+        // 计算费用差额
+        const originalAmount = {{ rental.total_amount }};
+        const amountDifference = actualAmount - originalAmount;
+        
         let crossLocationFee = 0;
-        let totalAmount = newAmount;
-        
-        // 计算超时费用
-        if (returnDate > endDate) {
-            extraDays = Math.floor((returnDate - endDate) / (1000 * 60 * 60 * 24));
-            overdueAmount = extraDays * dailyRate;
-            totalAmount += overdueAmount;
-        }
+        let totalAmount = actualAmount;
         
         // 计算异地还车费用（如果租车时未勾选但实际异地还车）
         if (needsCrossLocationFee) {
@@ -584,18 +583,20 @@ function updateCostPreview() {
             <div class="row">
                 <div class="col-md-6">
                     <h6>基础费用</h6>
-                    <p class="mb-1">计划天数: ${baseDays}天</p>
-                    <p class="mb-1">日租金: ¥${dailyRate.toFixed(2)}</p>
-                    <p class="mb-0">基础费用: ¥${baseAmount.toFixed(2)}</p>
+                    <p class="mb-1">计划租期：${plannedDays}天</p>
+                    <p class="mb-1">实际租期：${actualDays}天</p>
+                    <p class="mb-1">日租金：¥${dailyRate.toFixed(2)}</p>
+                    <p class="mb-0">基础金额：¥${actualBaseAmount.toFixed(2)}</p>
                 </div>
                 <div class="col-md-6">
                     <h6>优惠和额外费用</h6>
                     ${isVip ? `<p class="mb-1 text-success">VIP折扣(10%): -¥${discount.toFixed(2)}</p>` : ''}
-                    <p class="mb-1">基础小计: ¥${newAmount.toFixed(2)}</p>
-                    ${extraDays > 0 ? `<hr><p class="mb-1 text-warning">超期天数: ${extraDays}天</p><p class="mb-1">超时还车费用: +¥${overdueAmount.toFixed(2)}</p>` : ''}
+                    <p class="mb-1">实际租金: ¥${actualAmount.toFixed(2)}</p>
+                    ${amountDifference !== 0 ? `<p class="mb-1 ${amountDifference > 0 ? 'text-danger' : 'text-success'}">${amountDifference > 0 ? '超期补交' : '提前退费'}: ${amountDifference > 0 ? '+' : ''}¥${amountDifference.toFixed(2)}</p>` : ''}
                     ${needsCrossLocationFee ? `<hr><p class="mb-1 text-info">异地还车费用: +¥${crossLocationFee.toFixed(2)}</p><small class="text-muted">（还车门店与取车门店不同）</small>` : ''}
                     <hr>
-                    <strong>最终费用: ¥${totalAmount.toFixed(2)}</strong>
+                    <strong>订单总额: ¥${totalAmount.toFixed(2)}</strong>
+                    ${amountDifference !== 0 ? `<br><small class="${amountDifference > 0 ? 'text-danger' : 'text-success'}">${amountDifference > 0 ? '超期租赁' : '提前还车'}，相比预订${amountDifference > 0 ? '补交' : '退还'}¥${Math.abs(amountDifference).toFixed(2)}</small>` : ''}
                 </div>
             </div>
             ${actualIsCrossLocation && !needsCrossLocationFee ? '<div class="alert alert-info mt-2 mb-0"><small><i class="fas fa-info-circle"></i> 已预约异地还车，费用已包含</small></div>' : ''}

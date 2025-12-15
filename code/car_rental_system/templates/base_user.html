@@ -124,9 +124,9 @@
             min-height: 100vh;
         }
         
-        /* 页面内容初始隐藏，加载完成后显示 */
+        /* 页面内容直接显示，不再隐藏 */
         .page-content-wrapper {
-            opacity: 0;
+            opacity: 1;
             transition: opacity 0.3s ease-in;
         }
         
@@ -197,27 +197,21 @@
 
     <!-- 页面加载完成后隐藏加载器 -->
     <script>
-        // 页面加载完成后隐藏加载指示器
-        window.addEventListener('load', function() {
+        // DOM 加载完成就立即隐藏加载指示器（不等待图片等资源）
+        document.addEventListener('DOMContentLoaded', function() {
             var loader = document.getElementById('pageLoader');
             if (loader) {
                 loader.classList.add('hidden');
             }
-            
-            // 显示页面内容
-            var content = document.querySelector('.page-content-wrapper');
-            if (content) {
-                content.style.opacity = '1';
-            }
         });
         
-        // 如果资源加载失败，也隐藏加载器
+        // 兜底：如果 DOMContentLoaded 未触发，2秒后强制隐藏
         setTimeout(function() {
             var loader = document.getElementById('pageLoader');
             if (loader && !loader.classList.contains('hidden')) {
                 loader.classList.add('hidden');
             }
-        }, 5000); // 5秒后强制隐藏
+        }, 2000); // 2秒后强制隐藏
     </script>
     
     <!-- Bootstrap 5 JS - 必须在使用前加载 -->

@@ -49,6 +49,14 @@ class Vehicle(models.Model):
         validators=[MinValueValidator(Decimal('0.01'))],
         help_text='每日租金价格'
     )
+    vehicle_value = models.DecimalField(
+        '车辆价值',
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('100000.00'),
+        validators=[MinValueValidator(Decimal('10000.00'))],
+        help_text='车辆估值（用于押金计算）'
+    )
     status = models.CharField(
         '车辆状态',
         max_length=20,
