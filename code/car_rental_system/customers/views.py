@@ -32,9 +32,12 @@ def index(request):
 
 
 def customer_list(request):
-    """客户列表页 - 优化版本，避免N+1查询"""
-    # 获取所有客户
-    customers = Customer.objects.all()
+    """客户列表页 - 性能优化版本"""
+    # 只选择必要的字段，避免加载不需要的数据
+    customers = Customer.objects.only(
+        'id', 'name', 'phone', 'email', 'id_card', 'license_number', 
+        'license_type', 'member_level'
+    )
     
     # 处理搜索和筛选
     search_form = CustomerSearchForm(request.GET)
@@ -51,22 +54,19 @@ def customer_list(request):
         if member_level:
             customers = customers.filter(member_level=member_level)
     
-    # 使用聚合查询一次性获取所有客户的统计信息，避免N+1查询
-    from django.db.models import Prefetch
-    customers = customers.prefetch_related(
-        Prefetch('rentals', queryset=Rental.objects.only('total_amount'))
-    ).annotate(
+    # 使用聚合查询获取统计信息（移除 prefetch_related，列表页不需要访问租赁详情）
+    customers = customers.annotate(
         total_rentals=Count('rentals'),
         total_amount=Sum('rentals__total_amount')
     )
     
     # 分页（每页10条）
     paginator = Paginator(customers, 10)
-    page_number = request.GET.get('page')
+    page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
-    # 优化：避免重复查询总数
-    total_customers = customers.count() if not search_form.is_valid() or not (search_form.cleaned_data.get('search') or search_form.cleaned_data.get('member_level')) else page_obj.paginator.count
+    # 优化：使用 paginator.count 统一计数，避免重复查询
+    total_customers = page_obj.paginator.count
     
     context = {
         'page_obj': page_obj,
@@ -77,22 +77,31 @@ def customer_list(request):
 
 
 def customer_detail(request, pk):
-    """客户详情页"""
+    """客户详情页 - 增强版(支持分页、筛选、排序)"""
     customer = get_object_or_404(Customer, pk=pk)
     
-    # 获取客户的所有租赁记录
-    rentals = customer.rentals.all().select_related('vehicle').order_by('-created_at')
+    # 获取客户的所有租赁记录(用于统计)
+    all_rentals = customer.rentals.all().select_related('vehicle')
     
-    # 计算统计信息
-    total_rentals = rentals.count()
-    total_amount = rentals.aggregate(
+    # 计算总体统计信息(不受筛选影响)
+    total_rentals = all_rentals.count()
+    total_amount = all_rentals.aggregate(
         total=Sum('total_amount')
     )['total'] or 0
     
-    # 按状态统计
-    status_stats = rentals.values('status').annotate(
+    # 计算各状态订单数量(用于筛选器徽章)
+    status_counts = {'all': total_rentals}
+    status_stats = all_rentals.values('status').annotate(
         count=Count('id')
     ).order_by('status')
+    
+    for stat in status_stats:
+        status_counts[stat['status']] = stat['count']
+    
+    # 确保所有状态都有计数(包括数量为0的)
+    for status_code, _ in Rental.RENTAL_STATUS_CHOICES:
+        if status_code not in status_counts:
+            status_counts[status_code] = 0
     
     # 计算VIP节省的金额（假设VIP享受9折优惠）
     vip_discount_amount = 0
@@ -109,12 +118,69 @@ def customer_detail(request, pk):
             'remaining': max(0, 10 - consecutive_count)
         }
     
+    # === 分页、筛选、排序功能 ===
+    
+    # 1. 获取筛选参数
+    current_status = request.GET.get('status', 'all')
+    # 验证status参数是否合法
+    valid_statuses = ['all'] + [status[0] for status in Rental.RENTAL_STATUS_CHOICES]
+    if current_status not in valid_statuses:
+        current_status = 'all'
+    
+    # 2. 获取排序参数
+    current_sort = request.GET.get('sort', '-created_at')
+    # 定义允许的排序字段映射
+    sort_mapping = {
+        '-created_at': '-created_at',
+        'created_at': 'created_at',
+        '-start_date': '-start_date',
+        'start_date': 'start_date',
+        '-total_amount': '-total_amount',
+        'total_amount': 'total_amount',
+    }
+    # 验证sort参数是否合法
+    if current_sort not in sort_mapping:
+        current_sort = '-created_at'
+    
+    # 3. 获取分页参数
+    per_page = request.GET.get('per_page', '10')
+    try:
+        per_page = int(per_page)
+        if per_page not in [5, 10, 20, 50]:
+            per_page = 10
+    except ValueError:
+        per_page = 10
+    
+    # 4. 构建查询集
+    rentals_query = all_rentals
+    
+    # 应用状态筛选
+    if current_status != 'all':
+        rentals_query = rentals_query.filter(status=current_status)
+    
+    # 应用排序
+    rentals_query = rentals_query.order_by(sort_mapping[current_sort])
+    
+    # 5. 分页处理
+    paginator = Paginator(rentals_query, per_page)
+    page_number = request.GET.get('page', 1)
+    
+    # 处理无效页码
+    try:
+        page_obj = paginator.get_page(page_number)
+    except Exception:
+        page_obj = paginator.get_page(1)
+    
     context = {
         'customer': customer,
-        'rentals': rentals,
+        'page_obj': page_obj,
         'total_rentals': total_rentals,
         'total_amount': total_amount,
         'status_stats': status_stats,
+        'status_counts': status_counts,
+        'current_status': current_status,
+        'current_sort': current_sort,
+        'per_page': per_page,
         'vip_discount_amount': vip_discount_amount,
         'vip_upgrade_info': vip_upgrade_info,
     }

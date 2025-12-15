@@ -99,9 +99,19 @@ class RentalForm(forms.ModelForm):
         
         # 过滤出可用的客户和车辆
         self.fields['customer'].queryset = Customer.objects.all().order_by('name')
-        self.fields['vehicle'].queryset = Vehicle.objects.filter(
-            status='AVAILABLE'
-        ).order_by('license_plate')
+        
+        # 车辆查询集处理：编辑时需要包含当前订单的车辆
+        if self.instance.pk and self.instance.vehicle:
+            # 编辑模式：包含当前订单的车辆和所有可用车辆
+            from django.db.models import Q
+            self.fields['vehicle'].queryset = Vehicle.objects.filter(
+                Q(status='AVAILABLE') | Q(pk=self.instance.vehicle.pk)
+            ).order_by('license_plate')
+        else:
+            # 创建模式：只显示可用车辆
+            self.fields['vehicle'].queryset = Vehicle.objects.filter(
+                status='AVAILABLE'
+            ).order_by('license_plate')
         
         # 还车地点字段默认不是必填的
         self.fields['return_location'].required = False

@@ -24,6 +24,13 @@
           id="fontawesome-css"
           onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css';">
     
+    <!-- Bootstrap Icons - 使用国内CDN加速 -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css" 
+          rel="stylesheet" 
+          crossorigin="anonymous"
+          id="bootstrap-icons-css"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.min.css';">
+    
     <!-- 自定义CSS - 优先加载 -->
     <link href="{% static 'css/style.css' %}" rel="stylesheet">
     
@@ -52,13 +59,13 @@
             max-width: 100%;
         }
         
-        /* 页面内容初始隐藏，加载完成后显示 */
+        /* 页面内容初始显示，不再隐藏 */
         .page-content-wrapper {
-            opacity: 0;
+            opacity: 1;  /* 直接显示，不隐藏 */
             transition: opacity 0.3s ease-in;
         }
         
-        /* 页面加载指示器 */
+        /* 页面加载指示器 - 默认隐藏 */
         .page-loader {
             position: fixed;
             top: 0;
@@ -66,11 +73,14 @@
             width: 100%;
             height: 100%;
             background: rgba(255, 255, 255, 0.92);
-            display: flex;
+            display: none;  /* 默认隐藏 */
             align-items: center;
             justify-content: center;
             z-index: 2000;
             transition: opacity 0.3s ease;
+        }
+        .page-loader.show {
+            display: flex;  /* 显示时才使用 flex */
         }
         .page-loader.hidden {
             opacity: 0;
@@ -94,6 +104,48 @@
             to { transform: rotate(360deg); }
         }
         
+        /* 快速操作卡片样式 */
+        .quick-action-card {
+            display: block;
+            padding: 1.5rem 1rem;
+            background: #f8f9fa;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            height: 100%;
+            min-height: 120px;
+        }
+        
+        .quick-action-card:hover {
+            background: #ffffff;
+            border-color: #0d6efd;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .quick-action-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.75rem;
+            font-size: 1.5rem;
+        }
+        
+        .quick-action-text {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #23324d;
+            margin: 0;
+        }
+        
+        .quick-action-card:hover .quick-action-text {
+            color: #0d6efd;
+        }
+        
         @media (max-width: 768px) {
             .messages-container {
                 padding: 1rem;
@@ -101,6 +153,22 @@
             
             .container-fluid.px-0 {
                 padding: 1rem;
+            }
+            
+            .quick-action-card {
+                min-height: 100px;
+                padding: 1rem;
+            }
+            
+            .quick-action-icon {
+                width: 48px;
+                height: 48px;
+                font-size: 1.25rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .quick-action-text {
+                font-size: 0.875rem;
             }
         }
     </style>
@@ -111,6 +179,7 @@
         (function() {
             var bootstrapCSS = document.getElementById('bootstrap-css');
             var fontawesomeCSS = document.getElementById('fontawesome-css');
+            var bootstrapIconsCSS = document.getElementById('bootstrap-icons-css');
             
             // Bootstrap CSS 备选方案
             if (bootstrapCSS) {
@@ -128,6 +197,16 @@
                     var fallback = document.createElement('link');
                     fallback.rel = 'stylesheet';
                     fallback.href = '{% static "css/fontawesome.min.css" %}';
+                    document.head.appendChild(fallback);
+                };
+            }
+            
+            // Bootstrap Icons CSS 备选方案
+            if (bootstrapIconsCSS) {
+                bootstrapIconsCSS.onerror = function() {
+                    var fallback = document.createElement('link');
+                    fallback.rel = 'stylesheet';
+                    fallback.href = '{% static "css/bootstrap-icons.min.css" %}';
                     document.head.appendChild(fallback);
                 };
             }
@@ -213,7 +292,7 @@
             </div>
         </nav>
 
-        <!-- 页面加载指示器 -->
+    <!-- 页面加载指示器 - 默认隐藏 -->
     <div id="pageLoader" class="page-loader hidden">
         <div class="loader-content">
             <div class="spinner"></div>
@@ -261,26 +340,23 @@
         })();
     </script>
     
-    <!-- 页面加载完成后显示内容 -->
+    <!-- 页面加载完成后的优化 -->
     <script>
-        window.addEventListener('load', function() {
+        // 简化的加载逺辑，不再隐藏内容
+        window.addEventListener('DOMContentLoaded', function() {
             var loader = document.getElementById('pageLoader');
             if (loader) {
                 loader.classList.add('hidden');
             }
-            
-            var content = document.querySelector('.page-content-wrapper');
-            if (content) {
-                content.style.opacity = '1';
-            }
         });
         
+        // 备用：如果 DOMContentLoaded 未触发，2秒后强制隐藏加载器
         setTimeout(function() {
             var loader = document.getElementById('pageLoader');
             if (loader && !loader.classList.contains('hidden')) {
                 loader.classList.add('hidden');
             }
-        }, 5000);
+        }, 2000);
     </script>
     
     <!-- 自定义JS - 延迟加载 -->

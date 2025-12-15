@@ -193,6 +193,14 @@ def rental_update(request, pk):
     
     if request.method == 'POST':
         form = RentalForm(request.POST, instance=rental)
+        
+        # 如果订单已进行中或已完成，不允许修改客户和车辆
+        if rental.status in ['ONGOING', 'COMPLETED', 'CANCELLED']:
+            # 恢复原始值，不允许修改
+            form.data = form.data.copy()
+            form.data['customer'] = rental.customer.pk
+            form.data['vehicle'] = rental.vehicle.pk
+        
         if form.is_valid():
             with transaction.atomic():
                 rental = form.save(commit=False)
@@ -219,8 +227,8 @@ def rental_update(request, pk):
         
         # 如果订单已进行中或已完成，不允许修改客户和车辆
         if rental.status in ['ONGOING', 'COMPLETED', 'CANCELLED']:
-            form.fields['customer'].widget.attrs['disabled'] = True
-            form.fields['vehicle'].widget.attrs['disabled'] = True
+            form.fields['customer'].disabled = True
+            form.fields['vehicle'].disabled = True
     
     context = {
         'form': form,

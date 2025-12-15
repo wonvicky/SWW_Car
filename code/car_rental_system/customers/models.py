@@ -96,6 +96,10 @@ class Customer(models.Model):
             models.Index(fields=['license_number']),
             models.Index(fields=['phone']),
             models.Index(fields=['member_level']),
+            models.Index(fields=['name'], name='idx_customer_name'),
+            models.Index(fields=['created_at'], name='idx_created_at'),
+            # 复合索引：用于搜索优化
+            models.Index(fields=['name', 'member_level'], name='idx_name_level'),
         ]
     
     def check_vip_upgrade_eligibility(self):

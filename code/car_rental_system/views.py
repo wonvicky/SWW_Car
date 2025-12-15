@@ -81,13 +81,13 @@ def dashboard(request):
             'today': revenue_aggregate['today'] or 0,
         }
         
-        # 最近订单 - 使用select_related避免N+1查询
+        # 最近订单 - 使用select_related避免N+1查询（只显示最近5条）
         recent_rentals = Rental.objects.select_related(
             'customer', 'vehicle'
-        ).order_by('-created_at')[:10]
+        ).order_by('-created_at')[:5]
         
-        # 车辆状态概览 - 使用select_related并限制查询
-        vehicle_status = Vehicle.objects.select_related().order_by('status', 'license_plate')[:20]
+        # 车辆状态概览 - 使用select_related并限制查询（只显示最近5条）
+        vehicle_status = Vehicle.objects.select_related().order_by('status', 'license_plate')[:5]
         
         context = {
             'vehicle_stats': vehicle_stats,
