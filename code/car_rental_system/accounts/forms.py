@@ -331,3 +331,82 @@ class VehicleCompareForm(forms.Form):
         if len(vehicles) < 2:
             raise ValidationError('至少需要选择2辆车进行对比。')
         return vehicles
+
+
+class StudentCardDepositForm(forms.Form):
+    """学生卡抵押信息表单"""
+    student_card_image = forms.ImageField(
+        label='学生卡照片',
+        required=True,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/*'
+        }),
+        help_text='请上传学生卡正面清晰照片，支持JPG/PNG格式，大小不超过5MB'
+    )
+    student_id = forms.CharField(
+        label='学号',
+        max_length=50,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '请输入学号'
+        }),
+        help_text='请输入你的学号'
+    )
+    student_name = forms.CharField(
+        label='姓名',
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '请输入姓名'
+        }),
+        help_text='请输入与学生卡上一致的姓名'
+    )
+    student_school = forms.ChoiceField(
+        label='所属学校',
+        required=True,
+        choices=[
+            ('', '请选择学校'),
+            ('浙江工商大学', '浙江工商大学'),
+            ('杭州电子科技大学', '杭州电子科技大学'),
+            ('中国计量大学', '中国计量大学'),
+            ('浙江财经大学', '浙江财经大学'),
+            ('浙江传媒学院', '浙江传媒学院'),
+            ('其他', '其他')
+        ],
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        }),
+        help_text='选择你的学校'
+    )
+    student_major = forms.CharField(
+        label='院系专业',
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '请输入院系专业（选填）'
+        }),
+        help_text='选填，例如：计算机学院软件工程'
+    )
+    
+    def clean_student_card_image(self):
+        image = self.cleaned_data.get('student_card_image')
+        if image:
+            # 验证文件大小（5MB）
+            if image.size > 5 * 1024 * 1024:
+                raise ValidationError('学生卡照片大小不能超过5MB')
+            # 验证文件格式
+            if not image.name.lower().endswith(('.jpg', '.jpeg', '.png')):
+                raise ValidationError('仅支持JPG、PNG格式的图片')
+        return image
+    
+    def clean_student_id(self):
+        student_id = self.cleaned_data.get('student_id')
+        if student_id:
+            # 验证学号格式（一般为8-20位数字或字母数字组合）
+            if not re.match(r'^[A-Za-z0-9]{6,20}$', student_id):
+                raise ValidationError('学号格式不正确，应为6-20位的数字或字母')
+        return student_id

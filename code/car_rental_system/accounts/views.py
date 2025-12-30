@@ -936,8 +936,29 @@ def order_create_view(request):
     # 从URL参数获取车辆ID
     vehicle_id = request.GET.get('vehicle')
     
+    # 推荐押金方式
+    recommended_deposit_method = 'CASH'  # 默认现金押金
+    deposit_method_message = ''
+    
+    # 检查VIP状态
+    if customer.member_level == 'VIP':
+        recommended_deposit_method = 'VIP_FREE'
+        deposit_method_message = '您是VIP会员，享受免押金优惠！'
+    else:
+        # 检查是否首次租车
+        rental_count = Rental.objects.filter(customer=customer).count()
+        if rental_count == 0:
+            recommended_deposit_method = 'FIRST_FREE'
+            deposit_method_message = '首次租车免押金，欢迎体验！'
+        else:
+            # 推荐学生卡抵押
+            recommended_deposit_method = 'STUDENT_CARD'
+            deposit_method_message = '推荐使用学生卡抵押，无需支付现金押金！'
+    
     if request.method == 'POST':
         from rentals.forms import RentalForm
+        from accounts.forms import StudentCardDepositForm
+        
         # 处理还车地点：如果前端传递了return_location_actual，使用它；否则使用return_location
         post_data = request.POST.copy()
         # 检查是否勾选了异地还车
@@ -968,9 +989,45 @@ def order_create_view(request):
         return_location_choices.append(('__OTHER__', '其他（手动填写）'))
         form.fields['return_location'].widget.choices = return_location_choices
         
+        # 获取用户选择的押金方式
+        selected_deposit_method = post_data.get('deposit_method', 'CASH')
+        
+        # 如果选择学生卡抵押，验证学生卡信息
+        student_card_form = None
+        if selected_deposit_method == 'STUDENT_CARD':
+            student_card_form = StudentCardDepositForm(request.POST, request.FILES)
+            if not student_card_form.is_valid():
+                # 学生卡表单验证失败
+                messages.error(request, '学生卡信息验证失败，请检查输入的信息。')
+                # 重新设置表单并返回
+                context = {
+                    'form': form,
+                    'student_card_form': student_card_form,
+                    'customer': customer,
+                    'store_locations': STORE_LOCATIONS,
+                    'districts': get_all_districts(),
+                    'recommended_deposit_method': recommended_deposit_method,
+                    'deposit_method_message': deposit_method_message,
+                    'selected_deposit_method': selected_deposit_method,
+                }
+                return render(request, 'accounts/order_create.html', context)
+        
         if form.is_valid():
             with transaction.atomic():
                 rental = form.save(commit=False)
+                
+                # 设置押金方式
+                rental.deposit_method = selected_deposit_method
+                
+                # 如果选择学生卡抵押，保存学生卡信息
+                if selected_deposit_method == 'STUDENT_CARD' and student_card_form:
+                    rental.student_card_image = student_card_form.cleaned_data['student_card_image']
+                    rental.student_id = student_card_form.cleaned_data['student_id']
+                    rental.student_name = student_card_form.cleaned_data['student_name']
+                    rental.student_school = student_card_form.cleaned_data['student_school']
+                    rental.student_major = student_card_form.cleaned_data.get('student_major', '')
+                    rental.card_verified = False  # 初始状态未核验
+                    rental.card_returned = False  # 初始状态未归还
                 
                 # 计算总费用（基础租金 + VIP折扣）
                 from rentals.views import calculate_rental_amount
@@ -983,6 +1040,11 @@ def order_create_view(request):
                 # 注意：异地还车费用已经在表单的clean方法中设置，不需要在这里再次计算
                 # 但总金额需要包含异地还车费用（如果需要显示的话）
                 rental.total_amount = total_amount
+                
+                # 计算押金金额（使用动态押金计算方法）
+                deposit_amount, deposit_details = rental.calculate_dynamic_deposit()
+                rental.deposit = deposit_amount
+                
                 rental.save()
                 
                 # 更新车辆状态
@@ -991,15 +1053,24 @@ def order_create_view(request):
                     rental.vehicle.save()
                 
                 # 创建通知
+                notification_content = f'您的订单 #{rental.id} 已创建成功。'
+                if selected_deposit_method == 'STUDENT_CARD':
+                    notification_content += ' 请携带学生卡原件取车，工作人员将现场核验。'
+                elif selected_deposit_method in ['VIP_FREE', 'FIRST_FREE']:
+                    notification_content += f' {deposit_details.get("reason", "")}'
+                
                 Notification.objects.create(
                     user=request.user,
                     notification_type='ORDER_CREATED',
                     title='订单创建成功',
-                    content=f'您的订单 #{rental.id} 已创建成功。',
+                    content=notification_content,
                     related_rental=rental
                 )
                 
-                messages.success(request, f'订单创建成功！订单号：{rental.id}')
+                success_msg = f'订单创建成功！订单号：{rental.id}'
+                if selected_deposit_method == 'STUDENT_CARD':
+                    success_msg += ' 请携带学生卡原件取车。'
+                messages.success(request, success_msg)
                 return redirect('accounts:order_detail', pk=rental.pk)
         else:
             # 表单验证失败，显示错误信息
@@ -1031,11 +1102,18 @@ def order_create_view(request):
             except Vehicle.DoesNotExist:
                 messages.error(request, '选择的车辆不存在或不可用。')
     
+    # 创建学生卡表单（用于前端显示）
+    from accounts.forms import StudentCardDepositForm
+    student_card_form = StudentCardDepositForm()
+    
     context = {
         'form': form,
+        'student_card_form': student_card_form,
         'customer': customer,
         'store_locations': STORE_LOCATIONS,
         'districts': get_all_districts(),
+        'recommended_deposit_method': recommended_deposit_method,
+        'deposit_method_message': deposit_method_message,
     }
     
     return render(request, 'accounts/order_create.html', context)

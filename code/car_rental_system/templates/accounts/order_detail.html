@@ -344,7 +344,13 @@
                         <tr>
                             <td>押金
                                 {% if deposit_amount == 0 %}
-                                    {% if rental.customer.member_level == 'VIP' %}
+                                    {% if rental.deposit_method == 'VIP_FREE' %}
+                                        <span class="badge bg-warning ms-2">VIP免押金</span>
+                                    {% elif rental.deposit_method == 'FIRST_FREE' %}
+                                        <span class="badge bg-info ms-2">首次租车免押金</span>
+                                    {% elif rental.deposit_method == 'STUDENT_CARD' %}
+                                        <span class="badge bg-primary ms-2">学生卡抵押免押金</span>
+                                    {% elif rental.customer.member_level == 'VIP' %}
                                         <span class="badge bg-success ms-2">VIP免押金</span>
                                     {% else %}
                                         <span class="badge bg-info ms-2">首次租车免押金</span>
@@ -368,6 +374,81 @@
             </div>
         </div>
     </div>
+
+    {% if rental.deposit_method == 'STUDENT_CARD' %}
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-id-card me-2"></i>学生卡信息</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="border rounded-3 p-3">
+                        <h6 class="text-muted mb-3"><i class="fas fa-info-circle me-2"></i>基本信息</h6>
+                        <div class="mb-2">
+                            <strong>学号：</strong>
+                            <span class="text-muted">{{ rental.student_id|default:"-" }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>姓名：</strong>
+                            <span class="text-muted">{{ rental.student_name|default:"-" }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>学校：</strong>
+                            <span class="text-muted">{{ rental.student_school|default:"-" }}</span>
+                        </div>
+                        {% if rental.student_major %}
+                        <div class="mb-0">
+                            <strong>院系专业：</strong>
+                            <span class="text-muted">{{ rental.student_major }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded-3 p-3">
+                        <h6 class="text-muted mb-3"><i class="fas fa-check-circle me-2"></i>核验状态</h6>
+                        <div class="mb-2">
+                            <strong>学生卡核验：</strong>
+                            {% if rental.card_verified %}
+                                <span class="badge bg-success">已核验</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">待核验</span>
+                            {% endif %}
+                        </div>
+                        <div class="mb-0">
+                            <strong>学生卡归还：</strong>
+                            {% if rental.card_returned %}
+                                <span class="badge bg-success">已归还</span>
+                            {% elif rental.status == 'COMPLETED' %}
+                                <span class="badge bg-info">待确认</span>
+                            {% else %}
+                                <span class="badge bg-secondary">未归还</span>
+                            {% endif %}
+                        </div>
+                        {% if not rental.card_verified %}
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <small>请携带学生卡原件取车，工作人员将现场核验。</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if rental.student_card_image %}
+                <div class="col-12">
+                    <div class="border rounded-3 p-3">
+                        <h6 class="text-muted mb-3"><i class="fas fa-image me-2"></i>学生卡照片</h6>
+                        <div class="text-center">
+                            <img src="{{ rental.student_card_image.url }}" alt="学生卡照片" class="img-fluid rounded" style="max-width: 500px; max-height: 400px; cursor: pointer;" onclick="window.open('{{ rental.student_card_image.url }}', '_blank')">
+                            <p class="text-muted small mt-2 mb-0">点击图片查看大图</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="card shadow mb-4">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">

@@ -24,6 +24,13 @@ class Rental(models.Model):
         ('SETTLED', '已结算'),
     ]
     
+    DEPOSIT_METHOD_CHOICES = [
+        ('CASH', '现金押金'),
+        ('STUDENT_CARD', '学生卡抵押'),
+        ('VIP_FREE', 'VIP免押金'),
+        ('FIRST_FREE', '首次租车免押金'),
+    ]
+    
     customer = models.ForeignKey(
         Customer,
         on_delete=models.CASCADE,
@@ -153,6 +160,60 @@ class Rental(models.Model):
         decimal_places=2,
         default=Decimal('0.00'),
         help_text='系统累计退款金额'
+    )
+    
+    # 学生卡抵押相关字段
+    deposit_method = models.CharField(
+        '押金方式',
+        max_length=20,
+        choices=DEPOSIT_METHOD_CHOICES,
+        default='CASH',
+        help_text='押金缴纳方式'
+    )
+    student_card_image = models.ImageField(
+        '学生卡照片',
+        upload_to='student_cards/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text='学生卡正面照片'
+    )
+    student_id = models.CharField(
+        '学号',
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='学生学号'
+    )
+    student_name = models.CharField(
+        '学生姓名',
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='学生姓名'
+    )
+    student_school = models.CharField(
+        '学校名称',
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text='所属学校'
+    )
+    student_major = models.CharField(
+        '院系专业',
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text='院系专业（选填）'
+    )
+    card_verified = models.BooleanField(
+        '学生卡已核验',
+        default=False,
+        help_text='学生卡是否已线下核验'
+    )
+    card_returned = models.BooleanField(
+        '学生卡已归还',
+        default=False,
+        help_text='学生卡是否已归还'
     )
     
     class Meta:
@@ -296,11 +357,12 @@ class Rental(models.Model):
         """
         动态计算押金金额
         根据以下因素综合计算：
-        1. 车辆价值：车辆越贵，押金越高
-        2. 租赁时长：租期越长，风险系数越大
-        3. 客户信用：信用越高，押金折扣越多
-        4. 会员等级：VIP免押金
-        5. 首次租车：首次租车用户免押金
+        1. 押金方式：学生卡抵押、VIP免押金、首次免押金均为0
+        2. 车辆价值：车辆越贵，押金越高
+        3. 租赁时长：租期越长，风险系数越大
+        4. 客户信用：信用越高，押金折扣越多
+        5. 会员等级：VIP免押金
+        6. 首次租车：首次租车用户免押金
         
         计算公式：
         基础押金 = 车辆价值 * 基础押金率（0.03）
@@ -313,8 +375,21 @@ class Rental(models.Model):
         if not self.vehicle or not self.customer:
             return Decimal('0.00'), {}
         
+        # 学生卡抵押免押金
+        if self.deposit_method == 'STUDENT_CARD':
+            return Decimal('0.00'), {
+                'base_deposit': Decimal('0.00'),
+                'vehicle_value': getattr(self.vehicle, 'vehicle_value', Decimal('100000.00')),
+                'rental_days': self.rental_days,
+                'duration_factor': Decimal('1.00'),
+                'credit_score': getattr(self.customer, 'credit_score', 100),
+                'credit_discount': Decimal('1.00'),
+                'final_deposit': Decimal('0.00'),
+                'reason': '学生卡抵押，免押金'
+            }
+        
         # VIP用户免押金
-        if self.customer.member_level == 'VIP':
+        if self.customer.member_level == 'VIP' or self.deposit_method == 'VIP_FREE':
             return Decimal('0.00'), {
                 'base_deposit': Decimal('0.00'),
                 'vehicle_value': getattr(self.vehicle, 'vehicle_value', Decimal('100000.00')),
@@ -328,6 +403,18 @@ class Rental(models.Model):
         
         # 首次租车用户免押金
         # 检查该客户是否有已完成的订单（不包括当前订单）
+        if self.deposit_method == 'FIRST_FREE':
+            return Decimal('0.00'), {
+                'base_deposit': Decimal('0.00'),
+                'vehicle_value': getattr(self.vehicle, 'vehicle_value', Decimal('100000.00')),
+                'rental_days': self.rental_days,
+                'duration_factor': Decimal('1.00'),
+                'credit_score': getattr(self.customer, 'credit_score', 100),
+                'credit_discount': Decimal('1.00'),
+                'final_deposit': Decimal('0.00'),
+                'reason': '首次租车用户享受免押金优惠'
+            }
+        
         completed_rentals_count = Rental.objects.filter(
             customer=self.customer,
             status__in=['COMPLETED', 'CANCELLED']

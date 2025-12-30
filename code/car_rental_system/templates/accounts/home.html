@@ -46,21 +46,21 @@
     <section class="hero-section">
         <div class="hero-copy position-relative">
             <div class="recommendation-badge mb-3 text-dark">
-                <i class="fas fa-car me-2"></i>精选车辆
+                <i class="fas fa-car me-2"></i>学生优选
             </div>
-            <h1>让每一次出行都更舒心</h1>
-            <p>我们提供经过严格筛选与保养的车辆、专业顾问与灵活的租赁方案，满足商务出差、旅游度假、日常通勤、家庭出游、机场接送等各类出行需求，助您在每一次出行中都能轻松自在。</p>
+            <h1>周末结伴出发，自驾游说走就走</h1>
+            <p>专为下沙校区师生打造的租车平台，覆盖周边景点、露营地、特色小镇等热门目的地。3-5人组队更划算，车辆选择灵活，押金门槛低，支持异地还车，让你的周末出行自由又省心。</p>
             <ul class="list-unstyled hero-points mb-3">
-                <li><i class="fas fa-check-circle"></i>车辆按季度全面保养，保证交车状态稳定</li>
-                <li><i class="fas fa-check-circle"></i>专业团队一对一协助，快速响应行程调整</li>
-                <li><i class="fas fa-check-circle"></i>押金与异地费用自动化结算，账务清晰透明</li>
+                <li><i class="fas fa-check-circle"></i>车辆定期保养，安全出行有保障</li>
+                <li><i class="fas fa-check-circle"></i>随时在线客服，行程变更灵活调整</li>
+                <li><i class="fas fa-check-circle"></i>押金自动退还，费用清晰透明无套路</li>
             </ul>
             <div class="hero-actions">
                 <a href="{% url 'accounts:order_create' %}" class="btn btn-accent">
-                    <i class="fas fa-calendar-check me-2"></i>立即预约
+                    <i class="fas fa-calendar-check me-2"></i>立即租车
                 </a>
                 <a href="{% url 'accounts:my_orders' %}" class="btn btn-outline-secondary">
-                    <i class="fas fa-receipt me-2"></i>查看订单
+                    <i class="fas fa-receipt me-2"></i>我的订单
                 </a>
             </div>
         </div>
@@ -85,9 +85,9 @@
             </div>
             <div class="divider"></div>
             <div class="d-flex flex-wrap gap-2">
-                <span class="tag-pill"><i class="far fa-clock me-1"></i>30min备车</span>
-                <span class="tag-pill"><i class="far fa-shield-alt me-1"></i>专属顾问</span>
-                <span class="tag-pill"><i class="far fa-map me-1"></i>跨城返程</span>
+                <span class="tag-pill"><i class="far fa-clock me-1"></i>快速取车</span>
+                <span class="tag-pill"><i class="far fa-shield-alt me-1"></i>在线客服</span>
+                <span class="tag-pill"><i class="far fa-map me-1"></i>异地还车</span>
             </div>
         </div>
     </section>
@@ -95,8 +95,8 @@
     <section class="section section--light">
         <div class="section-header">
             <div>
-                <div class="section-title"><i class="fas fa-chart-line me-2 text-primary"></i>车队洞察</div>
-                <p class="section-description">实时掌握可用车型、租金区间及热门配置，帮助您快速找到理想车辆。</p>
+                <div class="section-title"><i class="fas fa-chart-line me-2 text-primary"></i>车型一览</div>
+                <p class="section-description">实时查看可用车型、价格区间和热门配置，快速找到适合你和小伙伴的车</p>
             </div>
             {% if popular_types %}
             <div class="d-flex flex-wrap gap-2 justify-content-end">
@@ -110,17 +110,17 @@
             <div class="surface surface--soft">
                 <span class="label text-muted text-uppercase">可用车辆</span>
                 <h3 class="mb-1 text-primary">{{ vehicle_stats.total }}</h3>
-                <p class="mb-0 text-muted">严选保养、随时可用</p>
+                <p class="mb-0 text-muted">车况良好、随订随用</p>
             </div>
             <div class="surface surface--soft">
                 <span class="label text-muted text-uppercase">平均日租金</span>
                 <h3 class="mb-1 text-primary">¥{{ vehicle_stats.avg_rate|floatformat:0 }}</h3>
-                <p class="mb-0 text-muted">含尊享服务套餐</p>
+                <p class="mb-0 text-muted">学生友好价，组队更划算</p>
             </div>
             <div class="surface surface--soft">
                 <span class="label text-muted text-uppercase">座位配置</span>
                 <h3 class="mb-1 text-primary">{{ vehicle_stats.seat_options }}</h3>
-                <p class="mb-0 text-muted">覆盖各类出行需求</p>
+                <p class="mb-0 text-muted">2-7座车型，满足不同组队需求</p>
             </div>
         </div>
     </section>
@@ -129,10 +129,10 @@
     <section class="section">
         <div class="section-header">
             <div>
-                <div class="section-title"><i class="fas fa-star text-warning me-2"></i>个性化推荐</div>
-                <p class="section-description">结合您的用车历史与热门趋势，为您匹配更合适的车型。</p>
+                <div class="section-title"><i class="fas fa-star text-warning me-2"></i>猜你喜欢</div>
+                <p class="section-description">根据你的租车记录和热门车型，推荐更适合你的选择</p>
             </div>
-            <a href="{% url 'accounts:my_orders' %}" class="btn btn-outline-secondary"><i class="fas fa-clock me-2"></i>查看最近记录</a>
+            <a href="{% url 'accounts:my_orders' %}" class="btn btn-outline-secondary"><i class="fas fa-clock me-2"></i>我的历史订单</a>
         </div>
         <div class="vehicle-grid">
             {% for vehicle in recommended_vehicles %}
@@ -154,8 +154,8 @@
                         <li><i class="fas fa-palette"></i>{{ vehicle.color|default:"经典色" }}</li>
                     </ul>
                     <div class="vehicle-meta-line">
-                        <span><i class="far fa-clock me-1"></i>优先取车</span>
-                        <span><i class="far fa-shield-alt me-1"></i>专属保养</span>
+                        <span><i class="far fa-clock me-1"></i>快速取车</span>
+                        <span><i class="far fa-shield-alt me-1"></i>定期保养</span>
                     </div>
                     <div class="vehicle-card-action">
                         <a href="{% url 'accounts:vehicle_detail' vehicle.pk %}" class="btn btn-primary">
@@ -172,10 +172,10 @@
     <section class="section business-filters">
         <div class="section-header border-0 mb-3 pb-0">
             <div>
-                <div class="section-title"><i class="fas fa-filter text-primary me-2"></i>精确筛选</div>
-                <p class="section-description">输入需求即可快速锁定合适车型，支持多条件组合检索。</p>
+                <div class="section-title"><i class="fas fa-filter text-primary me-2"></i>找车很简单</div>
+                <p class="section-description">输入车牌、品牌或选择座位数，快速找到心仪车辆</p>
             </div>
-            <span class="filter-accent"><i class="fas fa-magic"></i>智能匹配 · 快速定位</span>
+            <span class="filter-accent"><i class="fas fa-magic"></i>多条件筛选 · 一键直达</span>
         </div>
         <form method="get" action="{% url 'accounts:home' %}" class="row g-3">
             <div class="col-md-4">
@@ -227,8 +227,8 @@
     <section class="section">
         <div class="section-header">
             <div>
-                <div class="section-title"><i class="fas fa-car-side text-primary me-2"></i>全部车辆</div>
-                <p class="section-description">覆盖经济型轿车、商务轿车、MPV、SUV 等多种车型，满足各类出行场景。</p>
+                <div class="section-title"><i class="fas fa-car-side text-primary me-2"></i>所有可租车辆</div>
+                <p class="section-description">涵盖经济型轿车、SUV、MPV 等多种车型，无论是双人出行还是多人组队，都能找到合适的车</p>
             </div>
             <div class="text-muted">共 {{ vehicles.paginator.count }} 辆可预约</div>
         </div>
@@ -252,8 +252,8 @@
                         <li><i class="fas fa-fill-drip"></i>{{ vehicle.color }}</li>
                     </ul>
                     <div class="vehicle-meta-line">
-                        <span><i class="far fa-clock me-1"></i>随时可用</span>
-                        <span><i class="far fa-user-shield me-1"></i>专属礼宾</span>
+                        <span><i class="far fa-clock me-1"></i>随订随用</span>
+                        <span><i class="far fa-user-shield me-1"></i>贴心服务</span>
                     </div>
                     <div class="vehicle-card-action">
                         <a href="{% url 'accounts:vehicle_detail' vehicle.pk %}" class="btn btn-outline-secondary">
@@ -303,7 +303,7 @@
     <section class="section text-center">
         <i class="fas fa-car fa-3x text-muted mb-3"></i>
         <h4 class="text-muted">暂无可用车辆</h4>
-        <p class="text-muted">请稍后再来查看或联系您的专属顾问</p>
+        <p class="text-muted">请稍后再来查看或联系客服</p>
     </section>
     {% endif %}
 </div>

@@ -95,6 +95,127 @@
                             </div>
                         </div>
 
+                        <!-- 押金方式选择 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">
+                                <i class="fas fa-shield-alt me-1"></i>押金方式 <span class="text-danger">*</span>
+                            </label>
+                            {% if deposit_method_message %}
+                            <div class="alert alert-success mb-3">
+                                <i class="fas fa-info-circle me-2"></i>{{ deposit_method_message }}
+                            </div>
+                            {% endif %}
+                            <div class="border rounded p-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="deposit_method" id="deposit_method_cash" value="CASH" {% if recommended_deposit_method == 'CASH' %}checked{% endif %}>
+                                    <label class="form-check-label" for="deposit_method_cash">
+                                        <i class="fas fa-money-bill-wave text-success me-2"></i>现金押金
+                                        <small class="text-muted d-block ms-4">根据车辆价值和租期自动计算押金金额</small>
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="deposit_method" id="deposit_method_student_card" value="STUDENT_CARD" {% if recommended_deposit_method == 'STUDENT_CARD' %}checked{% endif %}>
+                                    <label class="form-check-label" for="deposit_method_student_card">
+                                        <i class="fas fa-id-card text-primary me-2"></i>学生卡抵押
+                                        <small class="text-muted d-block ms-4">无需支付现金押金，还车时当场取回学生卡</small>
+                                    </label>
+                                </div>
+                                {% if customer.member_level == 'VIP' %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="deposit_method" id="deposit_method_vip_free" value="VIP_FREE" {% if recommended_deposit_method == 'VIP_FREE' %}checked{% endif %}>
+                                    <label class="form-check-label" for="deposit_method_vip_free">
+                                        <i class="fas fa-crown text-warning me-2"></i>VIP免押金
+                                        <small class="text-muted d-block ms-4">VIP会员专享，无需押金</small>
+                                    </label>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 学生卡信息表单（选择学生卡抵押时显示） -->
+                        <div id="student-card-form-section" class="mb-4" style="display: none;">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-id-card me-2"></i>学生卡信息
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-warning mb-3">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        <strong>温馨提示：</strong>请确保上传的学生卡照片清晰可见，取车时需携带学生卡原件进行现场核验。
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="{{ student_card_form.student_card_image.id_for_label }}" class="form-label fw-semibold">
+                                            {{ student_card_form.student_card_image.label }} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ student_card_form.student_card_image }}
+                                        {% if student_card_form.student_card_image.help_text %}
+                                            <div class="form-text">{{ student_card_form.student_card_image.help_text }}</div>
+                                        {% endif %}
+                                        {% if student_card_form.student_card_image.errors %}
+                                            <div class="text-danger small mt-1">{{ student_card_form.student_card_image.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label for="{{ student_card_form.student_id.id_for_label }}" class="form-label fw-semibold">
+                                                {{ student_card_form.student_id.label }} <span class="text-danger">*</span>
+                                            </label>
+                                            {{ student_card_form.student_id }}
+                                            {% if student_card_form.student_id.help_text %}
+                                                <div class="form-text">{{ student_card_form.student_id.help_text }}</div>
+                                            {% endif %}
+                                            {% if student_card_form.student_id.errors %}
+                                                <div class="text-danger small mt-1">{{ student_card_form.student_id.errors.0 }}</div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <label for="{{ student_card_form.student_name.id_for_label }}" class="form-label fw-semibold">
+                                                {{ student_card_form.student_name.label }} <span class="text-danger">*</span>
+                                            </label>
+                                            {{ student_card_form.student_name }}
+                                            {% if student_card_form.student_name.help_text %}
+                                                <div class="form-text">{{ student_card_form.student_name.help_text }}</div>
+                                            {% endif %}
+                                            {% if student_card_form.student_name.errors %}
+                                                <div class="text-danger small mt-1">{{ student_card_form.student_name.errors.0 }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="{{ student_card_form.student_school.id_for_label }}" class="form-label fw-semibold">
+                                            {{ student_card_form.student_school.label }} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ student_card_form.student_school }}
+                                        {% if student_card_form.student_school.help_text %}
+                                            <div class="form-text">{{ student_card_form.student_school.help_text }}</div>
+                                        {% endif %}
+                                        {% if student_card_form.student_school.errors %}
+                                            <div class="text-danger small mt-1">{{ student_card_form.student_school.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-0">
+                                        <label for="{{ student_card_form.student_major.id_for_label }}" class="form-label fw-semibold">
+                                            {{ student_card_form.student_major.label }}
+                                        </label>
+                                        {{ student_card_form.student_major }}
+                                        {% if student_card_form.student_major.help_text %}
+                                            <div class="form-text">{{ student_card_form.student_major.help_text }}</div>
+                                        {% endif %}
+                                        {% if student_card_form.student_major.errors %}
+                                            <div class="text-danger small mt-1">{{ student_card_form.student_major.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 取车地点 -->
                         <div class="mb-4">
                             <label for="{{ form.pickup_location.id_for_label }}" class="form-label fw-semibold">
@@ -329,6 +450,30 @@
             endDateInput.addEventListener('change', updateDays);
         }
         
+        // 押金方式选择控制学生卡表单显示/隐藏
+        const depositMethodRadios = document.querySelectorAll('input[name="deposit_method"]');
+        const studentCardFormSection = document.getElementById('student-card-form-section');
+        
+        function toggleStudentCardForm() {
+            const selectedMethod = document.querySelector('input[name="deposit_method"]:checked');
+            if (selectedMethod && selectedMethod.value === 'STUDENT_CARD') {
+                if (studentCardFormSection) {
+                    studentCardFormSection.style.display = 'block';
+                }
+            } else {
+                if (studentCardFormSection) {
+                    studentCardFormSection.style.display = 'none';
+                }
+            }
+        }
+        
+        depositMethodRadios.forEach(function(radio) {
+            radio.addEventListener('change', toggleStudentCardForm);
+        });
+        
+        // 初始化时检查是否需要显示学生卡表单
+        toggleStudentCardForm();
+        
         // 异地还车复选框控制
         const crossLocationCheckbox = document.getElementById('{{ form.is_cross_location_return.id_for_label }}');
         const returnLocationGroup = document.getElementById('return-location-group');
@@ -420,7 +565,7 @@
                 if (crossLocationCheckbox && crossLocationCheckbox.checked) {
                     const selectedValue = returnLocationSelect ? returnLocationSelect.value : '';
                     if (selectedValue === '__OTHER__') {
-                        // 如果选择"其他"，使用手动输入的值
+                        // 如果选择“其他”，使用手动输入的值
                         const manualValue = returnLocationManual ? returnLocationManual.value.trim() : '';
                         if (!manualValue) {
                             e.preventDefault();
@@ -816,6 +961,30 @@ function selectOtherReturnLocation() {
         }
     } else {
         modalElement.classList.remove('show');
+        document.body.classList.remove('modal-open');
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.remove();
+    }
+    
+    // 重置下拉框状态
+    $('#returnDistrictSelect').val('');
+    $('#returnStoreSelect').prop('disabled', true).html('<option value="">请先选择区域</option>');
+    $('#returnStoreInfo').hide();
+}
+
+// 还车门店模态框打开时重置下拉框
+document.addEventListener('DOMContentLoaded', function() {
+    const modalElement = document.getElementById('returnStoreSelectModal');
+    if (modalElement) {
+        modalElement.addEventListener('show.bs.modal', function() {
+            $('#returnDistrictSelect').val('');
+            $('#returnStoreSelect').prop('disabled', true).html('<option value="">请先选择区域</option>');
+            $('#returnStoreInfo').hide();
+        });
+    }
+});
+</script>
+{% endblock %}
         document.body.classList.remove('modal-open');
         const backdrop = document.querySelector('.modal-backdrop');
         if (backdrop) backdrop.remove();
