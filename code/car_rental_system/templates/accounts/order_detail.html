@@ -342,7 +342,15 @@
                             <td class="text-end">¥{{ base_amount|floatformat:2 }}</td>
                         </tr>
                         <tr>
-                            <td>押金</td>
+                            <td>押金
+                                {% if deposit_amount == 0 %}
+                                    {% if rental.customer.member_level == 'VIP' %}
+                                        <span class="badge bg-success ms-2">VIP免押金</span>
+                                    {% else %}
+                                        <span class="badge bg-info ms-2">首次租车免押金</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
                             <td class="text-end">¥{{ deposit_amount|floatformat:2 }}</td>
                         </tr>
                         {% if has_cross_location_fee %}

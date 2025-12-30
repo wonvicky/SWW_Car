@@ -300,9 +300,10 @@ class Rental(models.Model):
         2. 租赁时长：租期越长，风险系数越大
         3. 客户信用：信用越高，押金折扣越多
         4. 会员等级：VIP免押金
+        5. 首次租车：首次租车用户免押金
         
         计算公式：
-        基础押金 = 车辆价值 * 基础押金率（0.05）
+        基础押金 = 车辆价值 * 基础押金率（0.03）
         时长系数 = 1 + (min(租赁天数, 30) - 1) * 0.01  （0-30天，每天增加1%）
         信用折扣 = 信用评分 / 100  （0.0-1.0）
         最终押金 = 基础押金 * 时长系数 * (2 - 信用折扣)
@@ -325,13 +326,32 @@ class Rental(models.Model):
                 'reason': 'VIP会员享受免押金优惠'
             }
         
+        # 首次租车用户免押金
+        # 检查该客户是否有已完成的订单（不包括当前订单）
+        completed_rentals_count = Rental.objects.filter(
+            customer=self.customer,
+            status__in=['COMPLETED', 'CANCELLED']
+        ).exclude(id=self.id).count()
+        
+        if completed_rentals_count == 0:
+            return Decimal('0.00'), {
+                'base_deposit': Decimal('0.00'),
+                'vehicle_value': getattr(self.vehicle, 'vehicle_value', Decimal('100000.00')),
+                'rental_days': self.rental_days,
+                'duration_factor': Decimal('1.00'),
+                'credit_score': getattr(self.customer, 'credit_score', 100),
+                'credit_discount': Decimal('1.00'),
+                'final_deposit': Decimal('0.00'),
+                'reason': '首次租车用户享受免押金优惠'
+            }
+        
         # 获取车辆价值（如果没有vehicle_value字段，使用日租金*365作为估算）
         vehicle_value = getattr(self.vehicle, 'vehicle_value', None)
         if vehicle_value is None:
             vehicle_value = self.vehicle.daily_rate * Decimal('365')  # 估算车辆价值
         
-        # 1. 计算基础押金（车辆价值的5%）
-        base_deposit_rate = Decimal('0.05')
+        # 1. 计算基础押金（车辆价值的3%，更符合实际）
+        base_deposit_rate = Decimal('0.03')
         base_deposit = vehicle_value * base_deposit_rate
         
         # 2. 租赁时长系数（0-30天，每天增加1%，最多30%）

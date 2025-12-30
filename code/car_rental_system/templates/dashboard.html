@@ -387,100 +387,134 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Chart.js 库 -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<!-- Chart.js 库 - 使用多个CDN备选方案 -->
+<script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js" 
+        onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js'"></script>
 <script>
-// 收入趋势折线图
-const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-const revenueChart = new Chart(revenueCtx, {
-    type: 'line',
-    data: {
-        labels: {{ monthly_labels|safe }},
-        datasets: [{
-            label: '月收入（元）',
-            data: {{ monthly_revenue_data|safe }},
-            borderColor: 'rgb(13, 110, 253)',
-            backgroundColor: 'rgba(13, 110, 253, 0.1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: true,
-                position: 'top',
-            },
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        return '收入: ¥' + context.parsed.y.toFixed(2);
-                    }
-                }
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    callback: function(value) {
-                        return '¥' + value;
-                    }
-                }
-            }
-        }
+// 等待Chart.js加载完成
+function initCharts() {
+    // 检查Chart是否加载成功
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js 加载失败，请检查网络连接');
+        // 显示错误提示
+        document.getElementById('revenueChart').parentElement.innerHTML = '<div class="alert alert-warning" role="alert"><i class="fas fa-exclamation-triangle me-2"></i>图表加载失败，请检查网络连接或刷新页面</div>';
+        document.getElementById('orderStatusChart').parentElement.innerHTML = '<div class="alert alert-warning" role="alert"><i class="fas fa-exclamation-triangle me-2"></i>图表加载失败，请检查网络连接或刷新页面</div>';
+        return;
     }
-});
 
-// 订单状态分布饼图
-const orderStatusCtx = document.getElementById('orderStatusChart').getContext('2d');
-const orderStatusChart = new Chart(orderStatusCtx, {
-    type: 'doughnut',
-    data: {
-        labels: ['进行中', '已完成', '预订中', '已超时'],
-        datasets: [{
-            data: [
-                {{ rental_stats.ongoing }},
-                {{ rental_stats.completed }},
-                {{ rental_stats.pending }},
-                {{ rental_stats.overdue }}
-            ],
-            backgroundColor: [
-                'rgba(13, 202, 240, 0.8)',
-                'rgba(25, 135, 84, 0.8)',
-                'rgba(255, 193, 7, 0.8)',
-                'rgba(220, 53, 69, 0.8)'
-            ],
-            borderWidth: 2,
-            borderColor: '#fff'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: true,
-                position: 'bottom',
-            },
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        const label = context.label || '';
-                        const value = context.parsed || 0;
-                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                        const percentage = ((value / total) * 100).toFixed(1);
-                        return label + ': ' + value + ' (' + percentage + '%)';
+    // 收入趋势折线图
+    const revenueCtx = document.getElementById('revenueChart');
+    if (revenueCtx) {
+        try {
+            const revenueChart = new Chart(revenueCtx.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: {{ monthly_labels|safe }},
+                    datasets: [{
+                        label: '月收入（元）',
+                        data: {{ monthly_revenue_data|safe }},
+                        borderColor: 'rgb(13, 110, 253)',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '收入: ¥' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '¥' + value;
+                                }
+                            }
+                        }
                     }
                 }
-            }
+            });
+        } catch (error) {
+            console.error('收入趋势图创建失败:', error);
         }
     }
-});
+
+    // 订单状态分布饼图
+    const orderStatusCtx = document.getElementById('orderStatusChart');
+    if (orderStatusCtx) {
+        try {
+            const orderStatusChart = new Chart(orderStatusCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['进行中', '已完成', '预订中', '已超时'],
+                    datasets: [{
+                        data: [
+                            {{ rental_stats.ongoing }},
+                            {{ rental_stats.completed }},
+                            {{ rental_stats.pending }},
+                            {{ rental_stats.overdue }}
+                        ],
+                        backgroundColor: [
+                            'rgba(13, 202, 240, 0.8)',
+                            'rgba(25, 135, 84, 0.8)',
+                            'rgba(255, 193, 7, 0.8)',
+                            'rgba(220, 53, 69, 0.8)'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return label + ': ' + value + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('订单状态图创建失败:', error);
+        }
+    }
+}
+
+// 页面加载完成后初始化图表
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(initCharts, 100); // 稍微延迟确保f库已加载
+    });
+} else {
+    setTimeout(initCharts, 100);
+}
 </script>
 {% endblock %}

@@ -155,6 +155,13 @@
                         <strong>恭喜！</strong>您已满足VIP升级条件（连续{{ vip_upgrade_info.consecutive_count }}个订单表现优异），系统将在下次还车时自动为您升级为VIP会员！
                     </div>
                     {% else %}
+                    <!-- 首次租车免押金提示 -->
+                    {% if vip_upgrade_info.consecutive_count == 0 %}
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-gift me-2"></i>
+                        <strong>新用户福利！</strong>首次租车享受<strong class="text-primary">免押金</strong>优惠，下单时无需支付押金！
+                    </div>
+                    {% endif %}
                     <div class="row align-items-center">
                         <div class="col-md-8">
                             <h6 class="mb-3">
